@@ -114,11 +114,23 @@ public class SpaceController {
 
     @Operation(summary = "팀원 목록", description = "팀 스페이스에 참여 중인 팀원 목록 조회")
     @GetMapping("/{spaceId}/members")
-    public ResponseEntity<ApiResponse<List<MemberDto>>> listMembers(@PathVariable Long spaceId) {
-        List<MemberDto> response = spaceMemberService.list(spaceId);
+    public ResponseEntity<ApiResponse<List<MemberDto>>> listMembers(
+            Authentication authentication,
+            @PathVariable Long spaceId
+    ) {
+        List<MemberDto> response =
+                spaceMemberService.list(
+                        requireUserId(authentication),
+                        spaceId
+                );
 
         return ResponseEntity.ok(
-                ApiResponse.success(HttpStatus.OK.value(), "member list retrieved successfully", response));
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "member list retrieved successfully",
+                        response
+                )
+        );
     }
 
     @Operation(summary = "팀원 삭제", description = "팀 스페이스에서 팀원 제거")

@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.domain.space.entity.SpaceType;
+import com.ssok.server.common.exception.InvalidRequestException;
 
 @Service
 @RequiredArgsConstructor
@@ -80,10 +81,14 @@ public class SpaceMemberService {
     }
 
     @Transactional(readOnly = true)
-    public List<MemberDto> list(Long spaceId) {
+    public List<MemberDto> list(Long userId, Long spaceId) {
         if (!spaceRepository.existsById(spaceId)) {
             throw new SpaceNotFoundException("space not found");
         }
+
+        spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
+                .orElseThrow(() ->
+                        new InvalidRequestException("space access denied"));
 
         return spaceMemberRepository.findAllBySpaceId(spaceId).stream()
                 .map(member -> new MemberDto(
