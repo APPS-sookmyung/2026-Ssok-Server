@@ -57,11 +57,22 @@ public class SpaceController {
 
     @Operation(summary = "스페이스 조회", description = "선택한 스페이스의 상세 정보 조회")
     @GetMapping("/{spaceId}")
-    public ResponseEntity<ApiResponse<SpaceDetailResponse>> getDetail(@PathVariable Long spaceId) {
-        SpaceDetailResponse response = spaceService.getDetail(spaceId);
+    public ResponseEntity<ApiResponse<SpaceDetailResponse>> getDetail(
+            Authentication authentication,
+            @PathVariable Long spaceId) {
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "space retrieved successfully", response));
+        SpaceDetailResponse response =
+                spaceService.getDetail(requireUserId(authentication), spaceId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "space retrieved successfully",
+                        response
+                )
+        );
     }
+
 
     @Operation(summary = "스페이스 삭제", description = "선택한 스페이스 삭제")
     @DeleteMapping("/{spaceId}")

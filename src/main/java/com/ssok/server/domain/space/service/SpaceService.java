@@ -66,16 +66,27 @@ public class SpaceService {
     }
 
     @Transactional(readOnly = true)
-    public SpaceDetailResponse getDetail(Long spaceId) {
+    public SpaceDetailResponse getDetail(Long userId, Long spaceId) {
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
 
-        long memberCount = spaceMemberRepository.findAllBySpaceId(spaceId).size();
+        spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
+                .orElseThrow(() ->
+                        new InvalidRequestException("space access denied"));
+
+        long memberCount = spaceMemberRepository.countBySpaceId(spaceId);
         long bookmarkCount = bookmarkRepository.countBySpaceId(spaceId);
 
         return new SpaceDetailResponse(
-                space.getId(), space.getName(), space.getDescription(), space.getType().name(),
-                space.getOwner().getId(), memberCount, bookmarkCount, TimeFormatter.format(space.getCreatedAt()));
+                space.getId(),
+                space.getName(),
+                space.getDescription(),
+                space.getType().name(),
+                space.getOwner().getId(),
+                memberCount,
+                bookmarkCount,
+                TimeFormatter.format(space.getCreatedAt())
+        );
     }
 
     @Transactional
