@@ -93,11 +93,23 @@ public class SpaceController {
     @Operation(summary = "팀원 초대", description = "팀 스페이스에 새로운 팀원 초대")
     @PostMapping("/{spaceId}/invite")
     public ResponseEntity<ApiResponse<MemberInviteResponse>> invite(
-            @PathVariable Long spaceId, @RequestBody @Valid MemberInviteRequest request) {
-        MemberInviteResponse response = spaceMemberService.invite(spaceId, request.email());
+            Authentication authentication,
+            @PathVariable Long spaceId,
+            @RequestBody @Valid MemberInviteRequest request) {
+
+        MemberInviteResponse response =
+                spaceMemberService.invite(
+                        requireUserId(authentication),
+                        spaceId,
+                        request.email()
+                );
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(HttpStatus.CREATED.value(), "member invited successfully", response));
+                .body(ApiResponse.success(
+                        HttpStatus.CREATED.value(),
+                        "member invited successfully",
+                        response
+                ));
     }
 
     @Operation(summary = "팀원 목록", description = "팀 스페이스에 참여 중인 팀원 목록 조회")

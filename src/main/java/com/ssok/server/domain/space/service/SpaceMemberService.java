@@ -17,6 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ssok.server.common.exception.InvalidRequestException;
+import com.ssok.server.domain.space.entity.SpaceType;
+
 @Service
 @RequiredArgsConstructor
 public class SpaceMemberService {
@@ -26,21 +29,54 @@ public class SpaceMemberService {
     private final UserRepository userRepository;
 
     @Transactional
-    public MemberInviteResponse invite(Long spaceId, String email) {
+    public MemberInviteResponse invite(
+            Long requesterId,
+            Long spaceId,
+            String email
+    ) {
         Space space = spaceRepository.findById(spaceId)
-                .orElseThrow(() -> new SpaceNotFoundException("space not found"));
+                .orElseThrow(() ->
+                        new SpaceNotFoundException("space not found"));
+
+        SpaceMember requester = spaceMemberRepository
+                .findBySpaceIdAndUserId(spaceId, requesterId)
+                .orElseThrow(() ->
+                        new InvalidRequestException("space access denied"));
+
+        if (requester.getRole() != SpaceRole.OWNER) {
+            throw new InvalidRequestException(
+                    "only owner can invite members");
+        }
+
+        if (space.getType() != SpaceType.TEAM) {
+            throw new InvalidRequestException(
+                    "members can only be invited to team spaces");
+        }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("user not found"));
+                .orElseThrow(() ->
+                        new UserNotFoundException("user not found"));
+
+        if (spaceMemberRepository.existsBySpaceIdAndUserId(
+                spaceId,
+                user.getId()
+        )) {
+            throw new InvalidRequestException(
+                    "user is already a member");
+        }
 
         SpaceMember member = SpaceMember.builder()
                 .space(space)
                 .user(user)
                 .role(SpaceRole.MEMBER)
                 .build();
+
         SpaceMember saved = spaceMemberRepository.save(member);
 
-        return new MemberInviteResponse(saved.getId(), user.getEmail());
+        return new MemberInviteResponse(
+                saved.getId(),
+                user.getEmail()
+        );
     }
 
     @Transactional(readOnly = true)
