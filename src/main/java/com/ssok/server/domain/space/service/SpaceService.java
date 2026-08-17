@@ -90,9 +90,20 @@ public class SpaceService {
     }
 
     @Transactional
-    public void delete(Long spaceId) {
+    public void delete(Long userId, Long spaceId) {
         Space space = spaceRepository.findById(spaceId)
-                .orElseThrow(() -> new SpaceNotFoundException("space not found"));
+                .orElseThrow(() ->
+                        new SpaceNotFoundException("space not found"));
+
+        SpaceMember requester = spaceMemberRepository
+                .findBySpaceIdAndUserId(spaceId, userId)
+                .orElseThrow(() ->
+                        new InvalidRequestException("space access denied"));
+
+        if (requester.getRole() != SpaceRole.OWNER) {
+            throw new InvalidRequestException(
+                    "only owner can delete the space");
+        }
 
         spaceRepository.delete(space);
     }

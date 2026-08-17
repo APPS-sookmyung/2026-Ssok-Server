@@ -73,13 +73,21 @@ public class SpaceController {
         );
     }
 
-
     @Operation(summary = "스페이스 삭제", description = "선택한 스페이스 삭제")
     @DeleteMapping("/{spaceId}")
-    public ResponseEntity<ApiResponse<Boolean>> delete(@PathVariable Long spaceId) {
-        spaceService.delete(spaceId);
+    public ResponseEntity<ApiResponse<Boolean>> delete(
+            Authentication authentication,
+            @PathVariable Long spaceId
+    ) {
+        spaceService.delete(requireUserId(authentication), spaceId);
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "space deleted successfully", true));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "space deleted successfully",
+                        true
+                )
+        );
     }
 
     @Operation(summary = "팀원 초대", description = "팀 스페이스에 새로운 팀원 초대")
