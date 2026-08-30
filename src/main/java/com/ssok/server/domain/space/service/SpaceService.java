@@ -40,6 +40,7 @@ public class SpaceService {
 
         Space space = Space.builder()
                 .name(request.spaceName())
+                .description(request.description())
                 .type(type)
                 .owner(owner)
                 .build();
@@ -52,7 +53,7 @@ public class SpaceService {
                 .build();
         spaceMemberRepository.save(ownerMembership);
 
-        return new SpaceCreateResponse(saved.getId(), saved.getName(), saved.getType().name());
+        return new SpaceCreateResponse(saved.getId(), saved.getName(), saved.getDescription(), saved.getType().name());
     }
 
     @Transactional(readOnly = true)
