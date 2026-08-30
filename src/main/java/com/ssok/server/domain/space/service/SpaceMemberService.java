@@ -101,10 +101,27 @@ public class SpaceMemberService {
     }
 
     @Transactional
-    public void remove(Long spaceId, Long memberId) {
-        SpaceMember member = spaceMemberRepository.findBySpaceIdAndId(spaceId, memberId)
-                .orElseThrow(() -> new MemberNotFoundException("member not found"));
+    public void remove(Long requesterId, Long spaceId, Long memberId) {
+        SpaceMember requester = spaceMemberRepository
+                .findBySpaceIdAndUserId(spaceId, requesterId)
+                .orElseThrow(() ->
+                        new InvalidRequestException("space access denied"));
 
-        spaceMemberRepository.delete(member);
+        if (requester.getRole() != SpaceRole.OWNER) {
+            throw new InvalidRequestException(
+                    "only owner can remove members");
+        }
+
+        SpaceMember target = spaceMemberRepository
+                .findBySpaceIdAndId(spaceId, memberId)
+                .orElseThrow(() ->
+                        new MemberNotFoundException("member not found"));
+
+        if (target.getRole() == SpaceRole.OWNER) {
+            throw new InvalidRequestException(
+                    "owner cannot be removed");
+        }
+
+        spaceMemberRepository.delete(target);
     }
 }

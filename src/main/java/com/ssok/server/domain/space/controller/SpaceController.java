@@ -136,10 +136,23 @@ public class SpaceController {
     @Operation(summary = "팀원 삭제", description = "팀 스페이스에서 팀원 제거")
     @DeleteMapping("/{spaceId}/members/{memberId}")
     public ResponseEntity<ApiResponse<Boolean>> removeMember(
-            @PathVariable Long spaceId, @PathVariable Long memberId) {
-        spaceMemberService.remove(spaceId, memberId);
+            Authentication authentication,
+            @PathVariable Long spaceId,
+            @PathVariable Long memberId
+    ) {
+        spaceMemberService.remove(
+                requireUserId(authentication),
+                spaceId,
+                memberId
+        );
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "member removed successfully", true));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "member removed successfully",
+                        true
+                )
+        );
     }
 
     private Long requireUserId(Authentication authentication) {
