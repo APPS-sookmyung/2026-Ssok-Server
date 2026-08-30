@@ -1,8 +1,6 @@
 package com.ssok.server.domain.space.service;
 
-import com.ssok.server.common.exception.MemberNotFoundException;
-import com.ssok.server.common.exception.SpaceNotFoundException;
-import com.ssok.server.common.exception.UserNotFoundException;
+import com.ssok.server.common.exception.*;
 import com.ssok.server.domain.space.dto.MemberDto;
 import com.ssok.server.domain.space.dto.MemberInviteResponse;
 import com.ssok.server.domain.space.entity.Space;
@@ -17,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.domain.space.entity.SpaceType;
 import com.ssok.server.common.exception.InvalidRequestException;
 
@@ -42,15 +39,15 @@ public class SpaceMemberService {
         SpaceMember requester = spaceMemberRepository
                 .findBySpaceIdAndUserId(spaceId, requesterId)
                 .orElseThrow(() ->
-                        new InvalidRequestException("space access denied"));
+                        new ForbiddenException("space access denied"));
 
         if (requester.getRole() != SpaceRole.OWNER) {
-            throw new InvalidRequestException(
+            throw new ForbiddenException(
                     "only owner can invite members");
         }
 
         if (space.getType() != SpaceType.TEAM) {
-            throw new InvalidRequestException(
+            throw new ForbiddenException(
                     "members can only be invited to team spaces");
         }
 
@@ -105,10 +102,10 @@ public class SpaceMemberService {
         SpaceMember requester = spaceMemberRepository
                 .findBySpaceIdAndUserId(spaceId, requesterId)
                 .orElseThrow(() ->
-                        new InvalidRequestException("space access denied"));
+                        new ForbiddenException("space access denied"));
 
         if (requester.getRole() != SpaceRole.OWNER) {
-            throw new InvalidRequestException(
+            throw new ForbiddenException(
                     "only owner can remove members");
         }
 
@@ -118,7 +115,7 @@ public class SpaceMemberService {
                         new MemberNotFoundException("member not found"));
 
         if (target.getRole() == SpaceRole.OWNER) {
-            throw new InvalidRequestException(
+            throw new ForbiddenException(
                     "owner cannot be removed");
         }
 

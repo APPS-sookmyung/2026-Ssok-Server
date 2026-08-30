@@ -1,5 +1,6 @@
 package com.ssok.server.domain.space.service;
 
+import com.ssok.server.common.exception.ForbiddenException;
 import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UnauthenticatedException;
@@ -73,7 +74,7 @@ public class SpaceService {
 
         spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
                 .orElseThrow(() ->
-                        new InvalidRequestException("space access denied"));
+                        new ForbiddenException("space access denied"));
 
         long memberCount = spaceMemberRepository.countBySpaceId(spaceId);
         long bookmarkCount = bookmarkRepository.countBySpaceId(spaceId);
@@ -99,10 +100,10 @@ public class SpaceService {
         SpaceMember requester = spaceMemberRepository
                 .findBySpaceIdAndUserId(spaceId, userId)
                 .orElseThrow(() ->
-                        new InvalidRequestException("space access denied"));
+                        new ForbiddenException("space access denied"));
 
         if (requester.getRole() != SpaceRole.OWNER) {
-            throw new InvalidRequestException(
+            throw new ForbiddenException(
                     "only owner can delete the space");
         }
 
