@@ -85,7 +85,6 @@ public class BookmarkService {
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
         bookmark.recordVisit();
-        bookmarkRepository.saveAndFlush(bookmark);
 
         return new BookmarkDetailResponse(
                 bookmark.getId(),

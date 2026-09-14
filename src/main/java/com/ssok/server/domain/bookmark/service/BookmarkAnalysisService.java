@@ -1,6 +1,7 @@
 package com.ssok.server.domain.bookmark.service;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +16,7 @@ public class BookmarkAnalysisService {
         String host = extractHost(url);
         String title = host;
         String summary = host + " 사이트에 대한 자동 생성 요약입니다.";
-        List<String> tags = List.of(capitalize(firstLabel(host)), "Bookmark");
+        List<String> tags = new ArrayList<>(List.of(capitalize(firstLabel(host)), "Bookmark"));
 
         return new BookmarkAnalysisResult(title, summary, tags);
     }

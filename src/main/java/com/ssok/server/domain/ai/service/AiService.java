@@ -37,7 +37,6 @@ public class AiService {
 
         BookmarkAnalysisResult analysis = bookmarkAnalysisService.analyze(bookmark.getUrl());
         bookmark.updateSummary(analysis.summary());
-        bookmarkRepository.saveAndFlush(bookmark);
 
         return new SummaryResponse(bookmark.getId(), bookmark.getSummary());
     }
