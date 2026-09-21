@@ -12,6 +12,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(DuplicateSpaceMemberException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateSpaceMember(DuplicateSpaceMemberException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(HttpStatus.CONFLICT.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateEmail(DuplicateEmailException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

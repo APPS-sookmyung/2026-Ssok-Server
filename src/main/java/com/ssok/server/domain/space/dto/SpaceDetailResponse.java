@@ -8,7 +8,7 @@ public record SpaceDetailResponse(
         Long spaceId,
 
         @Schema(description = "스페이스명", example = "캡스톤 프로젝트")
-        String name,
+        String spaceName,
 
         @Schema(description = "설명", example = "캡스톤 프로젝트 자료를 관리하는 스페이스")
         String description,

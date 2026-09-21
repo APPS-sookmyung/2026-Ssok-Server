@@ -1,11 +1,16 @@
 package com.ssok.server.domain.space.service;
 
-import com.ssok.server.common.exception.*;
+import com.ssok.server.common.exception.DuplicateSpaceMemberException;
+import com.ssok.server.common.exception.ForbiddenException;
+import com.ssok.server.common.exception.MemberNotFoundException;
+import com.ssok.server.common.exception.SpaceNotFoundException;
+import com.ssok.server.common.exception.UserNotFoundException;
 import com.ssok.server.domain.space.dto.MemberDto;
 import com.ssok.server.domain.space.dto.MemberInviteResponse;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceMember;
 import com.ssok.server.domain.space.entity.SpaceRole;
+import com.ssok.server.domain.space.entity.SpaceType;
 import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
@@ -14,9 +19,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.ssok.server.domain.space.entity.SpaceType;
-import com.ssok.server.common.exception.InvalidRequestException;
 
 @Service
 @RequiredArgsConstructor
@@ -59,7 +61,7 @@ public class SpaceMemberService {
                 spaceId,
                 user.getId()
         )) {
-            throw new InvalidRequestException(
+            throw new DuplicateSpaceMemberException(
                     "user is already a member");
         }
 
@@ -85,7 +87,7 @@ public class SpaceMemberService {
 
         spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
                 .orElseThrow(() ->
-                        new InvalidRequestException("space access denied"));
+                        new ForbiddenException("space access denied"));
 
         return spaceMemberRepository.findAllBySpaceId(spaceId).stream()
                 .map(member -> new MemberDto(
@@ -99,6 +101,10 @@ public class SpaceMemberService {
 
     @Transactional
     public void remove(Long requesterId, Long spaceId, Long memberId) {
+        if (!spaceRepository.existsById(spaceId)) {
+            throw new SpaceNotFoundException("space not found");
+        }
+
         SpaceMember requester = spaceMemberRepository
                 .findBySpaceIdAndUserId(spaceId, requesterId)
                 .orElseThrow(() ->

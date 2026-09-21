@@ -39,6 +39,7 @@ class SpaceMemberServiceTest {
     void MEMBER는_팀원을_삭제할_수_없다() {
         Long requesterId = 2L;
         Long spaceId = 1L;
+        given(spaceRepository.existsById(spaceId)).willReturn(true);
         Long memberId = 3L;
 
         SpaceMember requester = SpaceMember.builder()
@@ -62,6 +63,7 @@ class SpaceMemberServiceTest {
     void OWNER는_MEMBER를_삭제할_수_있다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
+        given(spaceRepository.existsById(spaceId)).willReturn(true);
         Long memberId = 3L;
 
         SpaceMember requester = SpaceMember.builder()
@@ -93,6 +95,7 @@ class SpaceMemberServiceTest {
     void OWNER는_OWNER를_삭제할_수_없다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
+        given(spaceRepository.existsById(spaceId)).willReturn(true);
         Long ownerMemberId = 2L;
 
         SpaceMember requester = SpaceMember.builder()
@@ -126,6 +129,7 @@ class SpaceMemberServiceTest {
     void 존재하지_않는_멤버는_삭제할_수_없다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
+        given(spaceRepository.existsById(spaceId)).willReturn(true);
         Long memberId = 999L;
 
         SpaceMember requester = SpaceMember.builder()

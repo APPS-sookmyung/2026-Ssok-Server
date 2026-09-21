@@ -8,7 +8,7 @@ public record SpaceCreateResponse(
         Long spaceId,
 
         @Schema(description = "스페이스명", example = "캡스톤 프로젝트")
-        String name,
+        String spaceName,
 
         @Schema(description = "스페이스 설명", example = "팀 프로젝트 자료를 관리하는 공간")
         String description,
