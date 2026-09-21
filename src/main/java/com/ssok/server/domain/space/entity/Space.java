@@ -59,8 +59,14 @@ public class Space {
     private List<Bookmark> bookmarks = new ArrayList<>();
 
     @Builder
-    public Space(String name, SpaceType type, User owner) {
+    public Space(
+            String name,
+            String description,
+            SpaceType type,
+            User owner
+    ) {
         this.name = name;
+        this.description = description;
         this.type = type;
         this.owner = owner;
     }
