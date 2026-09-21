@@ -57,46 +57,102 @@ public class SpaceController {
 
     @Operation(summary = "스페이스 조회", description = "선택한 스페이스의 상세 정보 조회")
     @GetMapping("/{spaceId}")
-    public ResponseEntity<ApiResponse<SpaceDetailResponse>> getDetail(@PathVariable Long spaceId) {
-        SpaceDetailResponse response = spaceService.getDetail(spaceId);
+    public ResponseEntity<ApiResponse<SpaceDetailResponse>> getDetail(
+            Authentication authentication,
+            @PathVariable Long spaceId) {
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "space retrieved successfully", response));
+        SpaceDetailResponse response =
+                spaceService.getDetail(requireUserId(authentication), spaceId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "space retrieved successfully",
+                        response
+                )
+        );
     }
 
     @Operation(summary = "스페이스 삭제", description = "선택한 스페이스 삭제")
     @DeleteMapping("/{spaceId}")
-    public ResponseEntity<ApiResponse<Boolean>> delete(@PathVariable Long spaceId) {
-        spaceService.delete(spaceId);
+    public ResponseEntity<ApiResponse<Boolean>> delete(
+            Authentication authentication,
+            @PathVariable Long spaceId
+    ) {
+        spaceService.delete(requireUserId(authentication), spaceId);
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "space deleted successfully", true));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "space deleted successfully",
+                        true
+                )
+        );
     }
 
     @Operation(summary = "팀원 초대", description = "팀 스페이스에 새로운 팀원 초대")
     @PostMapping("/{spaceId}/invite")
     public ResponseEntity<ApiResponse<MemberInviteResponse>> invite(
-            @PathVariable Long spaceId, @RequestBody @Valid MemberInviteRequest request) {
-        MemberInviteResponse response = spaceMemberService.invite(spaceId, request.email());
+            Authentication authentication,
+            @PathVariable Long spaceId,
+            @RequestBody @Valid MemberInviteRequest request) {
+
+        MemberInviteResponse response =
+                spaceMemberService.invite(
+                        requireUserId(authentication),
+                        spaceId,
+                        request.email()
+                );
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(HttpStatus.CREATED.value(), "member invited successfully", response));
+                .body(ApiResponse.success(
+                        HttpStatus.CREATED.value(),
+                        "member invited successfully",
+                        response
+                ));
     }
 
     @Operation(summary = "팀원 목록", description = "팀 스페이스에 참여 중인 팀원 목록 조회")
     @GetMapping("/{spaceId}/members")
-    public ResponseEntity<ApiResponse<List<MemberDto>>> listMembers(@PathVariable Long spaceId) {
-        List<MemberDto> response = spaceMemberService.list(spaceId);
+    public ResponseEntity<ApiResponse<List<MemberDto>>> listMembers(
+            Authentication authentication,
+            @PathVariable Long spaceId
+    ) {
+        List<MemberDto> response =
+                spaceMemberService.list(
+                        requireUserId(authentication),
+                        spaceId
+                );
 
         return ResponseEntity.ok(
-                ApiResponse.success(HttpStatus.OK.value(), "member list retrieved successfully", response));
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "member list retrieved successfully",
+                        response
+                )
+        );
     }
 
     @Operation(summary = "팀원 삭제", description = "팀 스페이스에서 팀원 제거")
     @DeleteMapping("/{spaceId}/members/{memberId}")
     public ResponseEntity<ApiResponse<Boolean>> removeMember(
-            @PathVariable Long spaceId, @PathVariable Long memberId) {
-        spaceMemberService.remove(spaceId, memberId);
+            Authentication authentication,
+            @PathVariable Long spaceId,
+            @PathVariable Long memberId
+    ) {
+        spaceMemberService.remove(
+                requireUserId(authentication),
+                spaceId,
+                memberId
+        );
 
-        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "member removed successfully", true));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        HttpStatus.OK.value(),
+                        "member removed successfully",
+                        true
+                )
+        );
     }
 
     private Long requireUserId(Authentication authentication) {

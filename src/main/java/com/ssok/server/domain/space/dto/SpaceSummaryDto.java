@@ -8,7 +8,7 @@ public record SpaceSummaryDto(
         Long spaceId,
 
         @Schema(description = "스페이스명", example = "개인")
-        String name,
+        String spaceName,
 
         @Schema(description = "스페이스 유형", example = "PERSONAL")
         String type,
