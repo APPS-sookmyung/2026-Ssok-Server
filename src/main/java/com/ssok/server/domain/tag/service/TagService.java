@@ -39,7 +39,7 @@ public class TagService {
     public TagBookmarkListResponse getBookmarksByTag(String tagName, int page, int size) {
         Page<Bookmark> result = bookmarkRepository.findByTagsContaining(tagName, PageRequest.of(page, size));
 
-        if (result.isEmpty()) {
+        if (result.getTotalElements() == 0) {
             throw new TagNotFoundException("tag not found");
         }
 

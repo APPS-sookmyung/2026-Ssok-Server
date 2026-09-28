@@ -64,7 +64,7 @@ public class Bookmark {
         this.url = url;
         this.title = title;
         this.summary = summary;
-        this.tags = tags != null ? tags : new ArrayList<>();
+        this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
         this.space = space;
         this.visitCount = 0;
     }
