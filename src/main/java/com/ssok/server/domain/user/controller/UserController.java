@@ -29,11 +29,10 @@ public class UserController {
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<ProfileUpdateResponse>> updateProfile(
             Authentication authentication, @RequestBody @Valid ProfileUpdateRequest request) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)) {
             throw new UnauthenticatedException("authentication required");
         }
 
-        Long userId = (Long) authentication.getPrincipal();
         ProfileUpdateResponse response = userService.updateProfile(userId, request);
 
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "profile updated successfully", response));
