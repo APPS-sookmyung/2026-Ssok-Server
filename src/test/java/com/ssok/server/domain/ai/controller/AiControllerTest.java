@@ -1,11 +1,13 @@
 package com.ssok.server.domain.ai.controller;
 
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssok.server.common.security.JwtTokenProvider;
 import com.ssok.server.domain.ai.dto.SemanticSearchRequest;
 import com.ssok.server.domain.ai.dto.SummaryRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
@@ -17,18 +19,24 @@ import com.ssok.server.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-@AutoConfigureMockMvc
 @Transactional
 class AiControllerTest {
 
     @Autowired
+    private WebApplicationContext context;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private MockMvc mockMvc;
 
     @Autowired
@@ -51,6 +59,12 @@ class AiControllerTest {
                 Space.builder().name("AI 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
 
         spaceId = space.getId();
+
+        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .build();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.ssok.server.domain.bookmark.controller;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssok.server.common.security.JwtTokenProvider;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceType;
@@ -17,18 +19,24 @@ import com.ssok.server.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-@AutoConfigureMockMvc
 @Transactional
 class BookmarkControllerTest {
 
     @Autowired
+    private WebApplicationContext context;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private MockMvc mockMvc;
 
     @Autowired
@@ -42,6 +50,8 @@ class BookmarkControllerTest {
 
     private Long spaceId;
 
+    private Long ownerId;
+
     @BeforeEach
     void setUp() {
         User owner = userRepository.save(
@@ -51,6 +61,13 @@ class BookmarkControllerTest {
                 Space.builder().name("테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
 
         spaceId = space.getId();
+        ownerId = owner.getId();
+
+        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .build();
     }
 
     @Test
@@ -141,6 +158,26 @@ class BookmarkControllerTest {
     void 존재하지_않는_북마크를_삭제하면_404를_반환한다() throws Exception {
         mockMvc.perform(delete("/api/bookmarks/{bookmarkId}", 999_999L))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 토큰_없이_요청하면_401을_반환한다() throws Exception {
+        MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+        anonymousMockMvc.perform(get("/api/bookmarks").param("spaceId", String.valueOf(spaceId)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 리프레시_토큰으로_요청하면_401을_반환한다() throws Exception {
+        String refreshToken = jwtTokenProvider.generateRefreshToken(ownerId);
+
+        mockMvc.perform(get("/api/bookmarks")
+                        .param("spaceId", String.valueOf(spaceId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
