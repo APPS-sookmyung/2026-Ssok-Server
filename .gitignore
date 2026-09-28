@@ -60,3 +60,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### macOS ###
+.DS_Store
+
+### Secrets ###
+application-secret.properties
