@@ -30,6 +30,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), e.getMessage()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(HttpStatus.FORBIDDEN.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(SpaceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleSpaceNotFound(SpaceNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -64,6 +70,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(InvalidRequestException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(AiServerException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiServer(AiServerException e) {
+        log.error("AI server call failed", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error(HttpStatus.BAD_GATEWAY.value(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

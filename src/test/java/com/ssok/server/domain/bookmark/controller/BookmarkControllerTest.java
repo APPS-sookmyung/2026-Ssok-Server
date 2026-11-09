@@ -12,7 +12,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssok.server.common.security.JwtTokenProvider;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.space.entity.Space;
+import com.ssok.server.domain.space.entity.SpaceMember;
+import com.ssok.server.domain.space.entity.SpaceRole;
 import com.ssok.server.domain.space.entity.SpaceType;
+import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
@@ -48,6 +51,9 @@ class BookmarkControllerTest {
     @Autowired
     private SpaceRepository spaceRepository;
 
+    @Autowired
+    private SpaceMemberRepository spaceMemberRepository;
+
     private Long spaceId;
 
     private Long ownerId;
@@ -59,6 +65,7 @@ class BookmarkControllerTest {
 
         Space space = spaceRepository.save(
                 Space.builder().name("테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(space).user(owner).role(SpaceRole.OWNER).build());
 
         spaceId = space.getId();
         ownerId = owner.getId();
@@ -71,17 +78,17 @@ class BookmarkControllerTest {
     }
 
     @Test
-    void 사이트를_저장하면_AI_분석_결과와_함께_201을_반환한다() throws Exception {
+    void 사이트를_저장하면_PENDING_상태와_함께_202를_반환한다() throws Exception {
         BookmarkSaveRequest request = new BookmarkSaveRequest("https://spring.io", spaceId);
 
         mockMvc.perform(post("/api/bookmarks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.bookmarkId").exists())
                 .andExpect(jsonPath("$.data.title").value("spring.io"))
-                .andExpect(jsonPath("$.data.tags").isArray());
+                .andExpect(jsonPath("$.data.analysisStatus").value("PENDING"));
     }
 
     @Test
@@ -187,7 +194,7 @@ class BookmarkControllerTest {
         String response = mockMvc.perform(post("/api/bookmarks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

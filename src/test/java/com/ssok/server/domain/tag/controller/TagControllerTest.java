@@ -2,24 +2,24 @@ package com.ssok.server.domain.tag.controller;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssok.server.common.security.JwtTokenProvider;
-import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
+import com.ssok.server.domain.bookmark.entity.Bookmark;
+import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceType;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
+import java.net.URI;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,25 +38,23 @@ class TagControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private SpaceRepository spaceRepository;
 
-    private Long spaceId;
+    @Autowired
+    private BookmarkRepository bookmarkRepository;
+
+    private Space space;
 
     @BeforeEach
     void setUp() {
         User owner = userRepository.save(
                 User.builder().email("tag-test@ssok.com").password("encoded").name("tester").build());
 
-        Space space = spaceRepository.save(
+        space = spaceRepository.save(
                 Space.builder().name("태그 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
-
-        spaceId = space.getId();
 
         String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -123,12 +121,14 @@ class TagControllerTest {
                 .andExpect(jsonPath("$.data.content.length()").value(0));
     }
 
-    private void saveBookmark(String url) throws Exception {
-        BookmarkSaveRequest request = new BookmarkSaveRequest(url, spaceId);
+    // 태그는 AI 분석 콜백으로 채워지므로, 분석이 끝난 북마크를 직접 저장한다.
+    private void saveBookmark(String url) {
+        String host = URI.create(url).getHost();
+        String label = host.substring(0, host.indexOf('.'));
+        String tag = Character.toUpperCase(label.charAt(0)) + label.substring(1);
 
-        mockMvc.perform(post("/api/bookmarks")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+        Bookmark bookmark = Bookmark.builder().url(url).title(host).space(space).build();
+        bookmark.completeAnalysis(host + " 요약", "개발/기술", List.of(tag, "Bookmark"));
+        bookmarkRepository.save(bookmark);
     }
 }

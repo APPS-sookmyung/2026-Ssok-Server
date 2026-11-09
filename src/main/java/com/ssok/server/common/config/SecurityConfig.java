@@ -22,6 +22,8 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/**",
+            // AI 서버 콜백: JWT 대신 X-AI-Callback-Secret 헤더로 검증
+            "/api/v1/bookmarks/ai-result",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",

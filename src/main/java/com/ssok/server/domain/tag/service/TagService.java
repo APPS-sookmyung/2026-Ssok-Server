@@ -50,6 +50,8 @@ public class TagService {
                         bookmark.getSummary(),
                         bookmark.getVisitCount(),
                         bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
+                        bookmark.getCategory(),
+                        bookmark.getAnalysisStatus(),
                         bookmark.getTags()))
                 .toList();
 

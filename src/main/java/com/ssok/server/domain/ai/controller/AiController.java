@@ -28,13 +28,13 @@ public class AiController {
 
     private final AiService aiService;
 
-    @Operation(summary = "AI 요약", description = "저장된 사이트를 AI가 분석하여 요약 내용 생성")
+    @Operation(summary = "AI 요약", description = "저장된 사이트의 AI 분석(요약/태그)을 다시 요청 (결과는 비동기로 반영)")
     @PostMapping("/summary")
     public ResponseEntity<ApiResponse<SummaryResponse>> summary(@RequestBody @Valid SummaryRequest request) {
         SummaryResponse response = aiService.summarize(request.bookmarkId());
 
-        return ResponseEntity.ok(
-                ApiResponse.success(HttpStatus.OK.value(), "summary generated successfully", response));
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(HttpStatus.ACCEPTED.value(), "analysis requested", response));
     }
 
     @Operation(summary = "의미 기반 검색", description = "사용자가 입력한 자연어와 의미적으로 가장 유사한 저장 사이트 검색")
