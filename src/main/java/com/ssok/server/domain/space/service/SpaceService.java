@@ -1,6 +1,5 @@
 package com.ssok.server.domain.space.service;
 
-import com.ssok.server.common.exception.ForbiddenException;
 import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UnauthenticatedException;
@@ -31,6 +30,7 @@ public class SpaceService {
     private final SpaceMemberRepository spaceMemberRepository;
     private final BookmarkRepository bookmarkRepository;
     private final UserRepository userRepository;
+    private final SpaceAccessService spaceAccessService;
 
     @Transactional
     public SpaceCreateResponse create(Long userId, SpaceCreateRequest request) {
@@ -72,9 +72,7 @@ public class SpaceService {
         Space space = spaceRepository.findById(spaceId)
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
 
-        spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
+        spaceAccessService.requireMember(userId, spaceId);
 
         long memberCount = spaceMemberRepository.countBySpaceId(spaceId);
         long bookmarkCount = bookmarkRepository.countBySpaceId(spaceId);
@@ -97,15 +95,7 @@ public class SpaceService {
                 .orElseThrow(() ->
                         new SpaceNotFoundException("space not found"));
 
-        SpaceMember requester = spaceMemberRepository
-                .findBySpaceIdAndUserId(spaceId, userId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
-
-        if (requester.getRole() != SpaceRole.OWNER) {
-            throw new ForbiddenException(
-                    "only owner can delete the space");
-        }
+        spaceAccessService.requireOwner(userId, spaceId, "only owner can delete the space");
 
         // 엔티티 삭제로 members/bookmarks에 REMOVE를 전파하고,
         // Bookmark의 ElementCollection인 bookmark_tags도 같은 트랜잭션에서 삭제한다.

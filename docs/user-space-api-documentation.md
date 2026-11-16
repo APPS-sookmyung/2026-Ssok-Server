@@ -95,6 +95,23 @@ Swagger의 `Authorize` 입력창에는 프로젝트 설정상 `accessToken`만 �
 - OWNER는 삭제 대상이 될 수 없습니다.
 - 스페이스 삭제 시 해당 스페이스의 북마크와 북마크 태그, 멤버 정보를 DB에서 함께 영구 삭제합니다.
 
+### 백엔드 공통 권한 서비스
+
+`SpaceAccessService`는 새 HTTP API가 아닌 백엔드 내부 공통 서비스입니다.
+`userId`에는 요청 본문이 아닌 인증 정보에서 추출한 사용자 ID를 전달합니다.
+
+| 메서드 | 동작 |
+|---|---|
+| `getAccessibleSpaceIds(userId)` | 현재 멤버십이 있는 개인·팀 스페이스 ID 목록. 없으면 빈 목록 |
+| `requireMember(userId, spaceId)` | 멤버 정보 반환. 비멤버는 403 |
+| `requireOwner(userId, spaceId)` | OWNER 정보 반환. 비멤버·MEMBER는 403 |
+| `resolveSearchSpaceIds(userId, spaceId)` | ID 미지정 시 전체 허용 목록. 지정 시 존재 여부·멤버십 확인 후 해당 ID만 반환 |
+
+- 검색 범위의 지정 스페이스가 없으면 404, 비멤버이면 403을 반환합니다.
+- `requireMember`와 `requireOwner`는 멤버십을 검사합니다. 리소스 존재 여부에 따른 404 처리는 호출 서비스에서 먼저 수행합니다.
+- 멤버십은 매번 DB에서 조회하며, 멤버 제거·스페이스 삭제 후 이전 권한 목록을 재사용하지 않습니다.
+- 기존 스페이스·팀원·북마크 API의 권한 검사를 공통화했습니다. AI·태그 API의 사용자 ID 전달 및 검색 범위 연결은 별도 작업입니다.
+
 ---
 
 # 4. 유저 API
