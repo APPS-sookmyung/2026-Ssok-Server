@@ -1,98 +1,82 @@
 package com.ssok.server.domain.ai.service;
 
 import com.ssok.server.common.exception.BookmarkNotFoundException;
+import com.ssok.server.domain.ai.client.AiServerClient;
+import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
 import com.ssok.server.domain.ai.dto.SimilarBookmarkResponse;
 import com.ssok.server.domain.ai.dto.SummaryResponse;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
+import com.ssok.server.domain.bookmark.event.BookmarkAnalysisRequestedEvent;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
-import com.ssok.server.domain.bookmark.service.BookmarkAnalysisResult;
-import com.ssok.server.domain.bookmark.service.BookmarkAnalysisService;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 실제 임베딩/벡터 검색 대신 단어 겹침(Jaccard) 기반으로 유사도를 계산하는 mock 구현.
- * 추후 실제 임베딩 기반 검색으로 교체 가능하도록 별도 서비스로 분리해둠.
- */
 @Service
 @RequiredArgsConstructor
 public class AiService {
 
-    private static final int TOP_N = 5;
+    private static final int TOP_K = 5;
 
     private final BookmarkRepository bookmarkRepository;
-    private final BookmarkAnalysisService bookmarkAnalysisService;
+    private final AiServerClient aiServerClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SummaryResponse summarize(Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
-        BookmarkAnalysisResult analysis = bookmarkAnalysisService.analyze(bookmark.getUrl());
-        bookmark.updateSummary(analysis.summary());
-        bookmarkRepository.saveAndFlush(bookmark);
+        bookmark.requestAnalysis();
+        eventPublisher.publishEvent(new BookmarkAnalysisRequestedEvent(bookmark.getId(), bookmark.getUrl()));
 
-        return new SummaryResponse(bookmark.getId(), bookmark.getSummary());
+        return new SummaryResponse(bookmark.getId(), bookmark.getAnalysisStatus());
     }
 
     @Transactional(readOnly = true)
     public List<SimilarBookmarkResponse> search(String query) {
-        Set<String> queryTokens = tokenize(query);
-
-        return rank(queryTokens, bookmarkRepository.findAll());
+        return toResponses(aiServerClient.search(query, TOP_K));
     }
 
+    /**
+     * AI 서버에 추천 전용 API가 없으므로, 대상 북마크의 제목과 요약을 검색어로 사용해 유사한 북마크를 찾는다.
+     */
     @Transactional(readOnly = true)
     public List<SimilarBookmarkResponse> recommend(Long bookmarkId) {
         Bookmark target = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
-        List<Bookmark> others = bookmarkRepository.findAll().stream()
-                .filter(bookmark -> !bookmark.getId().equals(target.getId()))
-                .toList();
-
-        return rank(tokensOf(target), others);
-    }
-
-    private List<SimilarBookmarkResponse> rank(Set<String> referenceTokens, List<Bookmark> candidates) {
-        return candidates.stream()
-                .map(bookmark ->
-                        new SimilarBookmarkResponse(bookmark.getId(), bookmark.getTitle(),
-                                similarity(referenceTokens, tokensOf(bookmark))))
-                .filter(dto -> dto.similarity() > 0)
-                .sorted(Comparator.comparingDouble(SimilarBookmarkResponse::similarity).reversed())
-                .limit(TOP_N)
-                .toList();
-    }
-
-    private Set<String> tokensOf(Bookmark bookmark) {
-        String text = bookmark.getTitle() + " " + bookmark.getSummary() + " " + String.join(" ", bookmark.getTags());
-        return tokenize(text);
-    }
-
-    private Set<String> tokenize(String text) {
-        return Arrays.stream(text.toLowerCase().split("[^a-z0-9가-힣]+"))
-                .filter(token -> !token.isBlank())
-                .collect(Collectors.toSet());
-    }
-
-    private double similarity(Set<String> a, Set<String> b) {
-        if (a.isEmpty() || b.isEmpty()) {
-            return 0.0;
+        if (target.getSummary() == null) {
+            return List.of();
         }
 
-        Set<String> intersection = new HashSet<>(a);
-        intersection.retainAll(b);
-        Set<String> union = new HashSet<>(a);
-        union.addAll(b);
+        List<AiSearchResponse.Result> results = aiServerClient.search(
+                target.getTitle() + " " + target.getSummary(), TOP_K + 1).stream()
+                .filter(result -> !target.getId().equals(result.bookmarkId()))
+                .limit(TOP_K)
+                .toList();
 
-        return Math.round((double) intersection.size() / union.size() * 100.0) / 100.0;
+        return toResponses(results);
+    }
+
+    // AI 서버가 돌려준 순서(유사도순)를 유지하고, 메인 DB에 없는 북마크는 제외한다.
+    private List<SimilarBookmarkResponse> toResponses(List<AiSearchResponse.Result> results) {
+        List<Long> ids = results.stream().map(AiSearchResponse.Result::bookmarkId).toList();
+        Map<Long, Bookmark> bookmarks = bookmarkRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Bookmark::getId, Function.identity()));
+
+        return results.stream()
+                .filter(result -> bookmarks.containsKey(result.bookmarkId()))
+                .map(result -> {
+                    Bookmark bookmark = bookmarks.get(result.bookmarkId());
+                    return new SimilarBookmarkResponse(bookmark.getId(), bookmark.getTitle(), bookmark.getUrl(),
+                            bookmark.getSummary(), result.similarity());
+                })
+                .toList();
     }
 }

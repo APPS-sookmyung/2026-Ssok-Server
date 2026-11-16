@@ -1,5 +1,6 @@
 package com.ssok.server.domain.bookmark.controller;
 
+import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.response.ApiResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,13 +31,14 @@ public class BookmarkController {
 
     private final BookmarkService bookmarkService;
 
-    @Operation(summary = "사이트 저장", description = "AI가 해당 사이트를 분석하여 북마크에 저장")
+    @Operation(summary = "사이트 저장", description = "북마크를 저장하고 AI 분석을 요청 (분석 결과는 비동기로 반영)")
     @PostMapping
-    public ResponseEntity<ApiResponse<BookmarkSaveResponse>> save(@RequestBody @Valid BookmarkSaveRequest request) {
-        BookmarkSaveResponse response = bookmarkService.save(request);
+    public ResponseEntity<ApiResponse<BookmarkSaveResponse>> save(
+            @RequestBody @Valid BookmarkSaveRequest request, Authentication authentication) {
+        BookmarkSaveResponse response = bookmarkService.save(requireUserId(authentication), request);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(HttpStatus.CREATED.value(), "bookmark saved successfully", response));
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(HttpStatus.ACCEPTED.value(), "bookmark saved, analysis in progress", response));
     }
 
     @Operation(summary = "저장 사이트 리스트", description = "저장된 사이트 목록 조회")
@@ -43,8 +46,9 @@ public class BookmarkController {
     public ResponseEntity<ApiResponse<BookmarkListResponse>> list(
             @RequestParam Long spaceId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        BookmarkListResponse response = bookmarkService.list(spaceId, page, size);
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        BookmarkListResponse response = bookmarkService.list(requireUserId(authentication), spaceId, page, size);
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "bookmark list retrieved successfully", response));
@@ -52,18 +56,28 @@ public class BookmarkController {
 
     @Operation(summary = "저장 사이트 삭제", description = "저장된 사이트 삭제")
     @DeleteMapping("/{bookmarkId}")
-    public ResponseEntity<ApiResponse<Boolean>> delete(@PathVariable Long bookmarkId) {
-        bookmarkService.delete(bookmarkId);
+    public ResponseEntity<ApiResponse<Boolean>> delete(
+            @PathVariable Long bookmarkId, Authentication authentication) {
+        bookmarkService.delete(requireUserId(authentication), bookmarkId);
 
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "bookmark deleted successfully", true));
     }
 
     @Operation(summary = "저장 사이트 조회", description = "저장된 사이트의 상세 정보 조회")
     @GetMapping("/{bookmarkId}")
-    public ResponseEntity<ApiResponse<BookmarkDetailResponse>> getDetail(@PathVariable Long bookmarkId) {
-        BookmarkDetailResponse response = bookmarkService.getDetail(bookmarkId);
+    public ResponseEntity<ApiResponse<BookmarkDetailResponse>> getDetail(
+            @PathVariable Long bookmarkId, Authentication authentication) {
+        BookmarkDetailResponse response = bookmarkService.getDetail(requireUserId(authentication), bookmarkId);
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "bookmark retrieved successfully", response));
+    }
+
+    private Long requireUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException("authentication required");
+        }
+
+        return (Long) authentication.getPrincipal();
     }
 }

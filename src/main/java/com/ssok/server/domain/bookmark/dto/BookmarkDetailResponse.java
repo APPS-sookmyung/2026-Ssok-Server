@@ -1,5 +1,6 @@
 package com.ssok.server.domain.bookmark.dto;
 
+import com.ssok.server.domain.bookmark.entity.AnalysisStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -25,6 +26,12 @@ public record BookmarkDetailResponse(
 
         @Schema(description = "마지막 방문 시각", example = "2026-06-29T21:10:33")
         String lastVisitedAt,
+
+        @Schema(description = "카테고리", example = "개발/기술")
+        String category,
+
+        @Schema(description = "AI 분석 상태", example = "SUCCESS")
+        AnalysisStatus analysisStatus,
 
         @Schema(description = "태그 목록")
         List<String> tags
