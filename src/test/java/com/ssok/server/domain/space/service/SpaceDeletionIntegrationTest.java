@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @DataJpaTest
-@Import(SpaceService.class)
+@Import({SpaceService.class, SpaceAccessService.class})
 class SpaceDeletionIntegrationTest {
 
     @Autowired private TestEntityManager entities;

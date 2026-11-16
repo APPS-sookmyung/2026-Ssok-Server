@@ -27,6 +27,7 @@ public class SpaceMemberService {
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
     private final UserRepository userRepository;
+    private final SpaceAccessService spaceAccessService;
 
     @Transactional
     public MemberInviteResponse invite(
@@ -38,15 +39,7 @@ public class SpaceMemberService {
                 .orElseThrow(() ->
                         new SpaceNotFoundException("space not found"));
 
-        SpaceMember requester = spaceMemberRepository
-                .findBySpaceIdAndUserId(spaceId, requesterId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
-
-        if (requester.getRole() != SpaceRole.OWNER) {
-            throw new ForbiddenException(
-                    "only owner can invite members");
-        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can invite members");
 
         if (space.getType() != SpaceType.TEAM) {
             throw new ForbiddenException(
@@ -85,9 +78,7 @@ public class SpaceMemberService {
             throw new SpaceNotFoundException("space not found");
         }
 
-        spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
+        spaceAccessService.requireMember(userId, spaceId);
 
         return spaceMemberRepository.findAllBySpaceId(spaceId).stream()
                 .map(member -> new MemberDto(
@@ -105,15 +96,7 @@ public class SpaceMemberService {
             throw new SpaceNotFoundException("space not found");
         }
 
-        SpaceMember requester = spaceMemberRepository
-                .findBySpaceIdAndUserId(spaceId, requesterId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
-
-        if (requester.getRole() != SpaceRole.OWNER) {
-            throw new ForbiddenException(
-                    "only owner can remove members");
-        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can remove members");
 
         SpaceMember target = spaceMemberRepository
                 .findBySpaceIdAndId(spaceId, memberId)

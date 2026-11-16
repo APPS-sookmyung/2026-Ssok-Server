@@ -15,7 +15,7 @@ import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
@@ -32,8 +32,13 @@ class SpaceMemberServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
     private SpaceMemberService spaceMemberService;
+
+    @BeforeEach
+    void setUp() {
+        spaceMemberService = new SpaceMemberService(spaceRepository, spaceMemberRepository, userRepository,
+                new SpaceAccessService(spaceMemberRepository, spaceRepository));
+    }
 
     @Test
     void MEMBER는_팀원을_삭제할_수_없다() {
