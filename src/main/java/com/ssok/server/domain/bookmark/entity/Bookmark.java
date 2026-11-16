@@ -5,6 +5,8 @@ import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -37,8 +39,15 @@ public class Bookmark {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, length = 2000)
+    @Column(length = 2000)
     private String summary;
+
+    @Column
+    private String category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AnalysisStatus analysisStatus;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "bookmark_tags", joinColumns = @JoinColumn(name = "bookmark_id"))
@@ -60,17 +69,30 @@ public class Bookmark {
     private Space space;
 
     @Builder
-    public Bookmark(String url, String title, String summary, List<String> tags, Space space) {
+    public Bookmark(String url, String title, Space space) {
         this.url = url;
         this.title = title;
-        this.summary = summary;
-        this.tags = tags != null ? tags : new ArrayList<>();
         this.space = space;
         this.visitCount = 0;
+        this.analysisStatus = AnalysisStatus.PENDING;
     }
 
-    public void updateSummary(String summary) {
+    public void requestAnalysis() {
+        this.analysisStatus = AnalysisStatus.PENDING;
+    }
+
+    public void completeAnalysis(String summary, String category, List<String> tags) {
         this.summary = summary;
+        this.category = category;
+        this.tags.clear();
+        if (tags != null) {
+            this.tags.addAll(tags);
+        }
+        this.analysisStatus = AnalysisStatus.SUCCESS;
+    }
+
+    public void failAnalysis() {
+        this.analysisStatus = AnalysisStatus.FAILED;
     }
 
     public void recordVisit() {

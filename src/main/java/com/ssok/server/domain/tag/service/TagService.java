@@ -39,7 +39,7 @@ public class TagService {
     public TagBookmarkListResponse getBookmarksByTag(String tagName, int page, int size) {
         Page<Bookmark> result = bookmarkRepository.findByTagsContaining(tagName, PageRequest.of(page, size));
 
-        if (result.isEmpty()) {
+        if (result.getTotalElements() == 0) {
             throw new TagNotFoundException("tag not found");
         }
 
@@ -50,6 +50,8 @@ public class TagService {
                         bookmark.getSummary(),
                         bookmark.getVisitCount(),
                         bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
+                        bookmark.getCategory(),
+                        bookmark.getAnalysisStatus(),
                         bookmark.getTags()))
                 .toList();
 

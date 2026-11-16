@@ -10,7 +10,6 @@ import com.ssok.server.domain.space.entity.SpaceMember;
 import com.ssok.server.domain.space.entity.SpaceRole;
 import com.ssok.server.domain.space.entity.SpaceType;
 import com.ssok.server.domain.user.entity.User;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,9 +118,11 @@ class SpaceDeletionIntegrationTest {
     }
 
     private Bookmark bookmark(Space space, String title) {
-        // PR #4와 동일하게 북마크의 space만 설정해 저장한다.
-        return entities.persist(Bookmark.builder().space(space).url("https://example.com/" + title)
-                .title(title).summary("summary").tags(new ArrayList<>(List.of("java", title))).build());
+        // 북마크를 스페이스 컬렉션에 추가하지 않고 저장한 경우에도 연쇄 삭제돼야 한다.
+        Bookmark bookmark = Bookmark.builder().space(space).url("https://example.com/" + title)
+                .title(title).build();
+        bookmark.completeAnalysis("summary", "test", List.of("java", title));
+        return entities.persist(bookmark);
     }
 
     private long count(String table, String column, Long id) {

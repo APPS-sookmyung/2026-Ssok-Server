@@ -615,4 +615,3 @@ DELETE /api/spaces/{spaceId}/members/{userId}
 - 요약 결과가 개인 데이터인지 팀 스페이스 데이터인지 결정합니다.
 
 ---
-

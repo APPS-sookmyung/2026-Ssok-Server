@@ -10,6 +10,12 @@ public record SimilarBookmarkResponse(
         @Schema(description = "제목", example = "Spring Boot Guide")
         String title,
 
+        @Schema(description = "URL", example = "https://spring.io/guides")
+        String url,
+
+        @Schema(description = "요약", example = "Spring Boot 입문 가이드")
+        String summary,
+
         @Schema(description = "유사도", example = "0.94")
         double similarity
 ) {
