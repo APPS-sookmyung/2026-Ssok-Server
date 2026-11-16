@@ -56,11 +56,18 @@ public class Space {
     private List<SpaceMember> members = new ArrayList<>();
 
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
+    // 스페이스 삭제 시 북마크와 그 태그 컬렉션까지 DB에서 제거한다.
     private List<Bookmark> bookmarks = new ArrayList<>();
 
     @Builder
-    public Space(String name, SpaceType type, User owner) {
+    public Space(
+            String name,
+            String description,
+            SpaceType type,
+            User owner
+    ) {
         this.name = name;
+        this.description = description;
         this.type = type;
         this.owner = owner;
     }

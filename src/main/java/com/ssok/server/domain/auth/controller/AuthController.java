@@ -7,6 +7,7 @@ import com.ssok.server.domain.auth.dto.RegisterRequest;
 import com.ssok.server.domain.auth.dto.RegisterResponse;
 import com.ssok.server.domain.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AuthController {
 
     @Operation(summary = "회원가입", description = "회원가입을 진행")
     @PostMapping("/register")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<RegisterResponse>> register(@RequestBody @Valid RegisterRequest request) {
         RegisterResponse response = authService.register(request);
 
@@ -36,6 +38,7 @@ public class AuthController {
 
     @Operation(summary = "로그인", description = "로그인 진행")
     @PostMapping("/login")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request) {
         LoginResponse response = authService.login(request);
 
