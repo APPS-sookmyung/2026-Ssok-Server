@@ -2,6 +2,7 @@ package com.ssok.server.domain.space.service;
 
 import com.ssok.server.common.exception.DuplicateSpaceMemberException;
 import com.ssok.server.common.exception.ForbiddenException;
+import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.MemberNotFoundException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UserNotFoundException;
@@ -27,6 +28,7 @@ public class SpaceMemberService {
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
     private final UserRepository userRepository;
+    private final SpaceAccessService spaceAccessService;
 
     @Transactional
     public MemberInviteResponse invite(
@@ -38,15 +40,7 @@ public class SpaceMemberService {
                 .orElseThrow(() ->
                         new SpaceNotFoundException("space not found"));
 
-        SpaceMember requester = spaceMemberRepository
-                .findBySpaceIdAndUserId(spaceId, requesterId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
-
-        if (requester.getRole() != SpaceRole.OWNER) {
-            throw new ForbiddenException(
-                    "only owner can invite members");
-        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can invite members");
 
         if (space.getType() != SpaceType.TEAM) {
             throw new ForbiddenException(
@@ -68,7 +62,7 @@ public class SpaceMemberService {
         SpaceMember member = SpaceMember.builder()
                 .space(space)
                 .user(user)
-                .role(SpaceRole.MEMBER)
+                .role(SpaceRole.EDITOR)
                 .build();
 
         SpaceMember saved = spaceMemberRepository.save(member);
@@ -85,9 +79,7 @@ public class SpaceMemberService {
             throw new SpaceNotFoundException("space not found");
         }
 
-        spaceMemberRepository.findBySpaceIdAndUserId(spaceId, userId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
+        spaceAccessService.requireWrite(userId, spaceId);
 
         return spaceMemberRepository.findAllBySpaceId(spaceId).stream()
                 .map(member -> new MemberDto(
@@ -105,15 +97,7 @@ public class SpaceMemberService {
             throw new SpaceNotFoundException("space not found");
         }
 
-        SpaceMember requester = spaceMemberRepository
-                .findBySpaceIdAndUserId(spaceId, requesterId)
-                .orElseThrow(() ->
-                        new ForbiddenException("space access denied"));
-
-        if (requester.getRole() != SpaceRole.OWNER) {
-            throw new ForbiddenException(
-                    "only owner can remove members");
-        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can remove members");
 
         SpaceMember target = spaceMemberRepository
                 .findBySpaceIdAndId(spaceId, memberId)
@@ -126,5 +110,24 @@ public class SpaceMemberService {
         }
 
         spaceMemberRepository.delete(target);
+    }
+
+    @Transactional
+    public MemberDto updateRole(Long requesterId, Long spaceId, Long memberId, SpaceRole role) {
+        if (!spaceRepository.existsById(spaceId)) {
+            throw new SpaceNotFoundException("space not found");
+        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can change member roles");
+        if (role == null || role == SpaceRole.OWNER) {
+            throw new InvalidRequestException("role must be EDITOR or VIEWER");
+        }
+        SpaceMember target = spaceMemberRepository.findBySpaceIdAndId(spaceId, memberId)
+                .orElseThrow(() -> new MemberNotFoundException("member not found"));
+        if (target.getRole() == SpaceRole.OWNER) {
+            throw new ForbiddenException("owner role cannot be changed");
+        }
+        target.updateRole(role);
+        return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
+                target.getUser().getEmail(), target.getRole().name());
     }
 }

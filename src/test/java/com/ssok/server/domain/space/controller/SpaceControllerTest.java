@@ -36,8 +36,8 @@ class SpaceControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new SpaceController(
-                        new SpaceService(spaces, members, bookmarks, users),
-                        new SpaceMemberService(spaces, members, users)))
+                        new SpaceService(spaces, members, bookmarks, users, new SpaceAccessService(members, spaces)),
+                        new SpaceMemberService(spaces, members, users, new SpaceAccessService(members, spaces))))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

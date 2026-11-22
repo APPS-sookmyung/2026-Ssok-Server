@@ -1,7 +1,6 @@
 package com.ssok.server.domain.bookmark.service;
 
 import com.ssok.server.common.exception.BookmarkNotFoundException;
-import com.ssok.server.common.exception.ForbiddenException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.util.TimeFormatter;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
@@ -13,7 +12,7 @@ import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.event.BookmarkAnalysisRequestedEvent;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
-import com.ssok.server.domain.space.repository.SpaceMemberRepository;
+import com.ssok.server.domain.space.service.SpaceAccessService;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import java.net.URI;
 import java.util.List;
@@ -30,14 +29,14 @@ public class BookmarkService {
 
     private final BookmarkRepository bookmarkRepository;
     private final SpaceRepository spaceRepository;
-    private final SpaceMemberRepository spaceMemberRepository;
+    private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
         Space space = spaceRepository.findById(request.spaceId())
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
-        validateSpaceMember(space.getId(), userId);
+        spaceAccessService.requireWrite(userId, space.getId());
 
         Bookmark bookmark = Bookmark.builder()
                 .url(request.url())
@@ -57,7 +56,7 @@ public class BookmarkService {
         if (!spaceRepository.existsById(spaceId)) {
             throw new SpaceNotFoundException("space not found");
         }
-        validateSpaceMember(spaceId, userId);
+        spaceAccessService.requireMember(userId, spaceId, "not a member of this space");
 
         Page<Bookmark> result = bookmarkRepository.findAllBySpaceId(spaceId, PageRequest.of(page, size));
 
@@ -81,7 +80,7 @@ public class BookmarkService {
     public void delete(Long userId, Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
-        validateSpaceMember(bookmark.getSpace().getId(), userId);
+        spaceAccessService.requireWrite(userId, bookmark.getSpace().getId());
 
         bookmarkRepository.delete(bookmark);
     }
@@ -92,7 +91,7 @@ public class BookmarkService {
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
         // 권한 검사를 통과한 경우에만 방문 기록을 남긴다.
-        validateSpaceMember(bookmark.getSpace().getId(), userId);
+        spaceAccessService.requireMember(userId, bookmark.getSpace().getId(), "not a member of this space");
 
         bookmark.recordVisit();
 
@@ -107,12 +106,6 @@ public class BookmarkService {
                 bookmark.getCategory(),
                 bookmark.getAnalysisStatus(),
                 bookmark.getTags());
-    }
-
-    private void validateSpaceMember(Long spaceId, Long userId) {
-        if (!spaceMemberRepository.existsBySpaceIdAndUserId(spaceId, userId)) {
-            throw new ForbiddenException("not a member of this space");
-        }
     }
 
     // AI 분석 결과에는 제목이 없으므로 URL의 호스트를 제목으로 사용한다.
