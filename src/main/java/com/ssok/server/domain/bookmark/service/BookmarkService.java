@@ -36,7 +36,7 @@ public class BookmarkService {
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
         Space space = spaceRepository.findById(request.spaceId())
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
-        spaceAccessService.requireMember(userId, space.getId(), "not a member of this space");
+        spaceAccessService.requireWrite(userId, space.getId());
 
         Bookmark bookmark = Bookmark.builder()
                 .url(request.url())
@@ -80,7 +80,7 @@ public class BookmarkService {
     public void delete(Long userId, Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
-        spaceAccessService.requireMember(userId, bookmark.getSpace().getId(), "not a member of this space");
+        spaceAccessService.requireWrite(userId, bookmark.getSpace().getId());
 
         bookmarkRepository.delete(bookmark);
     }

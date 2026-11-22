@@ -34,12 +34,15 @@ public class AiServerClient {
         }
     }
 
-    public List<AiSearchResponse.Result> search(String query, int topK) {
+    public List<AiSearchResponse.Result> search(String query, int topK, List<Long> spaceIds) {
+        if (spaceIds.isEmpty()) {
+            return List.of();
+        }
         try {
             AiSearchResponse response = aiRestClient.post()
                     .uri("/api/v1/ai/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new AiSearchRequest(query, topK))
+                    .body(new AiSearchRequest(query, topK, List.copyOf(spaceIds)))
                     .retrieve()
                     .body(AiSearchResponse.class);
 

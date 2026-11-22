@@ -52,4 +52,8 @@ public class SpaceMember {
         this.user = user;
         this.role = role;
     }
+
+    public void updateRole(SpaceRole role) {
+        this.role = role;
+    }
 }

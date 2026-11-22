@@ -2,6 +2,7 @@ package com.ssok.server.domain.space.service;
 
 import com.ssok.server.common.exception.DuplicateSpaceMemberException;
 import com.ssok.server.common.exception.ForbiddenException;
+import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.MemberNotFoundException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UserNotFoundException;
@@ -61,7 +62,7 @@ public class SpaceMemberService {
         SpaceMember member = SpaceMember.builder()
                 .space(space)
                 .user(user)
-                .role(SpaceRole.MEMBER)
+                .role(SpaceRole.EDITOR)
                 .build();
 
         SpaceMember saved = spaceMemberRepository.save(member);
@@ -78,7 +79,7 @@ public class SpaceMemberService {
             throw new SpaceNotFoundException("space not found");
         }
 
-        spaceAccessService.requireMember(userId, spaceId);
+        spaceAccessService.requireWrite(userId, spaceId);
 
         return spaceMemberRepository.findAllBySpaceId(spaceId).stream()
                 .map(member -> new MemberDto(
@@ -109,5 +110,24 @@ public class SpaceMemberService {
         }
 
         spaceMemberRepository.delete(target);
+    }
+
+    @Transactional
+    public MemberDto updateRole(Long requesterId, Long spaceId, Long memberId, SpaceRole role) {
+        if (!spaceRepository.existsById(spaceId)) {
+            throw new SpaceNotFoundException("space not found");
+        }
+        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can change member roles");
+        if (role == null || role == SpaceRole.OWNER) {
+            throw new InvalidRequestException("role must be EDITOR or VIEWER");
+        }
+        SpaceMember target = spaceMemberRepository.findBySpaceIdAndId(spaceId, memberId)
+                .orElseThrow(() -> new MemberNotFoundException("member not found"));
+        if (target.getRole() == SpaceRole.OWNER) {
+            throw new ForbiddenException("owner role cannot be changed");
+        }
+        target.updateRole(role);
+        return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
+                target.getUser().getEmail(), target.getRole().name());
     }
 }

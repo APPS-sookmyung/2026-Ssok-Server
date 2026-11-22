@@ -7,6 +7,7 @@ import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.tag.dto.TagBookmarkListResponse;
 import com.ssok.server.domain.tag.dto.TagDto;
+import com.ssok.server.domain.space.service.SpaceAccessService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -22,10 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class TagService {
 
     private final BookmarkRepository bookmarkRepository;
+    private final SpaceAccessService spaceAccessService;
 
     @Transactional(readOnly = true)
-    public List<TagDto> list() {
-        Map<String, Long> tagCounts = bookmarkRepository.findAll().stream()
+    public List<TagDto> list(Long userId, Long spaceId) {
+        List<Long> scope = spaceAccessService.resolveSearchSpaceIds(userId, spaceId);
+        if (scope.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Long> tagCounts = bookmarkRepository.findAllBySpaceIdIn(scope).stream()
                 .flatMap(bookmark -> bookmark.getTags().stream())
                 .collect(Collectors.groupingBy(tag -> tag, Collectors.counting()));
 
@@ -36,8 +42,10 @@ public class TagService {
     }
 
     @Transactional(readOnly = true)
-    public TagBookmarkListResponse getBookmarksByTag(String tagName, int page, int size) {
-        Page<Bookmark> result = bookmarkRepository.findByTagsContaining(tagName, PageRequest.of(page, size));
+    public TagBookmarkListResponse getBookmarksByTag(Long userId, Long spaceId, String tagName, int page, int size) {
+        List<Long> scope = spaceAccessService.resolveSearchSpaceIds(userId, spaceId);
+        Page<Bookmark> result = scope.isEmpty() ? Page.empty(PageRequest.of(page, size))
+                : bookmarkRepository.findBySpaceIdInAndTagsContaining(scope, tagName, PageRequest.of(page, size));
 
         if (result.getTotalElements() == 0) {
             throw new TagNotFoundException("tag not found");

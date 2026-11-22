@@ -28,7 +28,7 @@ class SpaceAccessIntegrationTest {
         Space personal = space(user, SpaceType.PERSONAL);
         Space joinedTeam = space(other, SpaceType.TEAM);
         Space foreignTeam = space(other, SpaceType.TEAM);
-        entities.persist(SpaceMember.builder().space(joinedTeam).user(user).role(SpaceRole.MEMBER).build());
+        entities.persist(SpaceMember.builder().space(joinedTeam).user(user).role(SpaceRole.EDITOR).build());
         entities.flush();
         entities.clear();
 
@@ -55,7 +55,7 @@ class SpaceAccessIntegrationTest {
         User owner = user("owner@test.com");
         Space team = space(owner, SpaceType.TEAM);
         SpaceMember membership = entities.persist(
-                SpaceMember.builder().space(team).user(user).role(SpaceRole.MEMBER).build());
+                SpaceMember.builder().space(team).user(user).role(SpaceRole.EDITOR).build());
         entities.flush();
         assertThat(access.getAccessibleSpaceIds(user.getId())).containsExactly(team.getId());
         entities.remove(membership);

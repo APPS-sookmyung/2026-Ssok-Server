@@ -52,7 +52,7 @@ class SpaceAccessServiceTest {
     @Test
     void memberCannotManageSpaceAndExistingMessageIsPreserved() {
         given(members.findBySpaceIdAndUserId(10L, 1L))
-                .willReturn(Optional.of(SpaceMember.builder().role(SpaceRole.MEMBER).build()));
+                .willReturn(Optional.of(SpaceMember.builder().role(SpaceRole.EDITOR).build()));
         assertThatThrownBy(() -> access.requireOwner(1L, 10L, "only owner can delete the space"))
                 .isInstanceOf(ForbiddenException.class).hasMessage("only owner can delete the space");
     }

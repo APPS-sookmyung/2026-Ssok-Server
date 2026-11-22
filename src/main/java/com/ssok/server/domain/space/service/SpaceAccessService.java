@@ -45,6 +45,32 @@ public class SpaceAccessService {
         return requireOwner(userId, spaceId, "only owner can manage the space");
     }
 
+    public SpaceMember requireWrite(Long userId, Long spaceId) {
+        SpaceMember member = requireMember(userId, spaceId);
+        if (!member.getRole().canWrite()) {
+            throw new ForbiddenException("viewer cannot modify space data");
+        }
+        return member;
+    }
+
+    public SpaceMember requireSearch(Long userId, Long spaceId) {
+        SpaceMember member = requireMember(userId, spaceId);
+        if (!member.getRole().canSearch()) {
+            throw new ForbiddenException("viewer cannot use search or AI");
+        }
+        return member;
+    }
+
+    /** 조회 전용 VIEWER 스페이스는 검색·AI 대상에 포함하지 않는다. */
+    public List<Long> getSearchableSpaceIds(Long userId) {
+        requireUserId(userId);
+        return spaceMemberRepository.findAllByUserId(userId).stream()
+                .filter(member -> member.getRole().canSearch())
+                .map(member -> member.getSpace().getId())
+                .distinct()
+                .toList();
+    }
+
     /** 기존 API별 오류 메시지를 유지하면서 OWNER 정책을 공유한다. */
     public SpaceMember requireOwner(Long userId, Long spaceId, String message) {
         SpaceMember member = requireMember(userId, spaceId);
@@ -58,12 +84,12 @@ public class SpaceAccessService {
     public List<Long> resolveSearchSpaceIds(Long userId, Long spaceId) {
         requireUserId(userId);
         if (spaceId == null) {
-            return getAccessibleSpaceIds(userId);
+            return getSearchableSpaceIds(userId);
         }
         if (!spaceRepository.existsById(spaceId)) {
             throw new SpaceNotFoundException("space not found");
         }
-        requireMember(userId, spaceId);
+        requireSearch(userId, spaceId);
         return List.of(spaceId);
     }
 

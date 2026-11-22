@@ -10,6 +10,9 @@ import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceType;
+import com.ssok.server.domain.space.entity.SpaceMember;
+import com.ssok.server.domain.space.entity.SpaceRole;
+import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
@@ -44,6 +47,9 @@ class TagControllerTest {
     private SpaceRepository spaceRepository;
 
     @Autowired
+    private SpaceMemberRepository spaceMemberRepository;
+
+    @Autowired
     private BookmarkRepository bookmarkRepository;
 
     private Space space;
@@ -55,6 +61,7 @@ class TagControllerTest {
 
         space = spaceRepository.save(
                 Space.builder().name("태그 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(space).user(owner).role(SpaceRole.OWNER).build());
 
         String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
