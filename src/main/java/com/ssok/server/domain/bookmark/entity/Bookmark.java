@@ -123,6 +123,15 @@ public class Bookmark {
         this.space = target;
     }
 
+    /**
+     * 아직 시간 초과 전인 분석이 진행 중인지.
+     */
+    public boolean isAnalysisInProgress(java.time.Duration timeout) {
+        return analysisStatus == AnalysisStatus.PENDING
+                && analysisRequestedAt != null
+                && analysisRequestedAt.isAfter(LocalDateTime.now().minus(timeout));
+    }
+
     public boolean isCurrentAnalysisRequest(String requestId) {
         return analysisRequestId != null && analysisRequestId.equals(requestId);
     }

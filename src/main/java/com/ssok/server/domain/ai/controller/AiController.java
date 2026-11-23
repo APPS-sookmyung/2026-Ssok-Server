@@ -30,7 +30,9 @@ public class AiController {
 
     private final AiService aiService;
 
-    @Operation(summary = "AI 요약", description = "저장된 사이트의 AI 분석(요약/태그)을 다시 요청 (결과는 비동기로 반영)")
+    @Operation(summary = "AI 요약",
+            description = "저장된 사이트의 AI 분석(요약/태그)을 다시 요청 (결과는 비동기로 반영, 분석 상태 확인 API로 확인). "
+                    + "이미 분석 중이면 새로 요청하지 않고 현재 상태(PENDING)를 돌려준다")
     @PostMapping("/summary")
     public ResponseEntity<ApiResponse<SummaryResponse>> summary(
             @RequestBody @Valid SummaryRequest request, Authentication authentication) {
