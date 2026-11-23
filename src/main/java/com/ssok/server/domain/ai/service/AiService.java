@@ -2,7 +2,12 @@ package com.ssok.server.domain.ai.service;
 
 import com.ssok.server.common.exception.BookmarkNotFoundException;
 import com.ssok.server.domain.ai.client.AiServerClient;
+import com.ssok.server.domain.ai.client.dto.AiSearchRequest;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
+import com.ssok.server.domain.ai.client.dto.AiTimeFormat;
+import com.ssok.server.domain.ai.dto.SearchPeriod;
+import com.ssok.server.domain.ai.dto.SemanticSearchRequest;
+import com.ssok.server.domain.ai.dto.SemanticSearchResponse;
 import com.ssok.server.domain.ai.dto.SimilarBookmarkResponse;
 import com.ssok.server.domain.ai.dto.SummaryResponse;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
@@ -47,15 +52,23 @@ public class AiService {
     /**
      * spaceId를 지정하면 그 스페이스에서만, 생략하면 사용자가 속한 모든 스페이스에서 검색한다.
      * 권한 없는 스페이스를 지정하면 403, 접근 가능한 스페이스가 없으면 AI 호출 없이 0건을 반환한다.
+     * 저장 날짜 조건은 AI에 전달하고, 돌려받은 결과도 다시 걸러낸다.
      */
     @Transactional(readOnly = true)
-    public List<SimilarBookmarkResponse> search(Long userId, String query, Long spaceId) {
-        List<Long> scope = spaceAccessService.resolveSearchScope(userId, spaceId);
+    public SemanticSearchResponse search(Long userId, SemanticSearchRequest request) {
+        SearchPeriod period = SearchPeriod.of(request.savedFrom(), request.savedTo());
+        List<Long> scope = spaceAccessService.resolveSearchScope(userId, request.spaceId());
         if (scope.isEmpty()) {
-            return List.of();
+            return SemanticSearchResponse.of(List.of());
         }
 
-        return toResponses(aiServerClient.search(query, TOP_K, scope), scope);
+        List<AiSearchResponse.Result> results = aiServerClient.search(new AiSearchRequest(
+                request.query(), request.limitOrDefault(), scope,
+                AiTimeFormat.format(period.from()), AiTimeFormat.format(period.to())));
+
+        return SemanticSearchResponse.of(toResponses(results, scope, period).stream()
+                .limit(request.limitOrDefault())
+                .toList());
     }
 
     /**
@@ -73,12 +86,12 @@ public class AiService {
         }
 
         List<Long> scope = spaceAccessService.resolveSearchScope(userId, null);
-        List<AiSearchResponse.Result> results = aiServerClient.search(
-                        target.getTitle() + " " + target.getSummary(), TOP_K + 1, scope).stream()
+        List<AiSearchResponse.Result> results = aiServerClient.search(new AiSearchRequest(
+                        target.getTitle() + " " + target.getSummary(), TOP_K + 1, scope)).stream()
                 .filter(result -> !target.getId().equals(result.bookmarkId()))
                 .toList();
 
-        return toResponses(results, scope).stream().limit(TOP_K).toList();
+        return toResponses(results, scope, SearchPeriod.ALL).stream().limit(TOP_K).toList();
     }
 
     /**
@@ -86,11 +99,12 @@ public class AiService {
      * 메인 DB에 없는 북마크와, AI 결과가 범위를 벗어났거나 그 사이 권한이 바뀐 북마크는 제외한다.
      */
     private List<SimilarBookmarkResponse> toResponses(List<AiSearchResponse.Result> results,
-            Collection<Long> allowedSpaceIds) {
+            Collection<Long> allowedSpaceIds, SearchPeriod period) {
         Set<Long> allowed = new HashSet<>(allowedSpaceIds);
         List<Long> ids = results.stream().map(AiSearchResponse.Result::bookmarkId).toList();
         Map<Long, Bookmark> bookmarks = bookmarkRepository.findAllById(ids).stream()
                 .filter(bookmark -> allowed.contains(bookmark.getSpace().getId()))
+                .filter(bookmark -> period.contains(bookmark.getCreatedAt()))
                 .collect(Collectors.toMap(Bookmark::getId, Function.identity()));
 
         return results.stream()
