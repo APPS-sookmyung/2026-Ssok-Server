@@ -8,6 +8,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     @Modifying
+    @Query("update Notification n set n.actorId = null where n.actorId = :userId")
+    int anonymizeActor(@Param("userId") Long userId);
+    @Modifying
     @Query(value = """
             insert into notifications (recipient_id, type, event_key, actor_id, space_id, bookmark_id, invitation_id, created_at)
             values (:userId, :type, :key, :actorId, :spaceId, :bookmarkId, :invitationId, :now)

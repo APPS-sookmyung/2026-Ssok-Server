@@ -20,6 +20,26 @@ import org.springframework.web.client.RestClient;
 
 class AiServerClientTest {
 
+    @Test
+    void spaceVectorDeletionUsesAgreedPathAndSecret() {
+        org.springframework.test.util.ReflectionTestUtils.setField(aiServerClient, "vectorDeleteSecret", "test-only-secret");
+        server.expect(requestTo("http://ai-server/api/v1/ai/vectors?space_id=8"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("X-AI-Secret", "test-only-secret"))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(org.springframework.http.HttpStatus.NO_CONTENT));
+        aiServerClient.deleteSpaceVectors(8L);
+        server.verify();
+    }
+
+    @Test
+    void vectorDeletionRequiresSecretAndDoesNotAcceptUnexpectedSuccessStatus() {
+        assertThatThrownBy(() -> aiServerClient.deleteSpaceVectors(8L)).isInstanceOf(AiServerException.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(aiServerClient, "vectorDeleteSecret", "test-only-secret");
+        server.expect(requestTo("http://ai-server/api/v1/ai/vectors?space_id=8")).andRespond(withSuccess());
+        assertThatThrownBy(() -> aiServerClient.deleteSpaceVectors(8L)).isInstanceOf(AiServerException.class);
+        server.verify();
+    }
+
     private MockRestServiceServer server;
     private AiServerClient aiServerClient;
 

@@ -20,8 +20,10 @@ public class StoredFile {
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;
     // 계정 삭제 정책과 분리하기 위해 인증된 업로더 ID를 저장한다.
-    @Column(nullable = false)
+    @Column
     private Long uploaderId;
+
+    public void anonymizeUploader() { uploaderId = null; }
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bookmark_id", unique = true)
     private Bookmark bookmark;

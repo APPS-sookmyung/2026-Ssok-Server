@@ -21,7 +21,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
-            "/api/auth/**",
+            "/api/auth/register", "/api/auth/login", "/api/auth/refresh",
             // AI 서버 콜백: JWT 대신 X-AI-Callback-Secret 헤더로 검증
             "/api/v1/bookmarks/ai-result",
             "/swagger-ui/**",
@@ -61,8 +61,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
-        return new JwtAuthenticationFilter(jwtTokenProvider);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(com.ssok.server.domain.auth.service.SessionService sessions) {
+        return new JwtAuthenticationFilter(sessions);
     }
 
     @Bean

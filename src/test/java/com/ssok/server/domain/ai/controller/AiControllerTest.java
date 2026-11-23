@@ -44,6 +44,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @Transactional
 class AiControllerTest {
+    @Autowired private com.ssok.server.domain.auth.service.SessionService testSessions;
 
     @Autowired
     private WebApplicationContext context;
@@ -85,7 +86,7 @@ class AiControllerTest {
         spring = saveAnalyzedBookmark("https://spring.io", "spring.io", "Java 웹 프레임워크", space);
         github = saveAnalyzedBookmark("https://github.com", "github.com", "코드 호스팅 서비스", space);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        String accessToken = testSessions.open(owner.getId()).accessToken();
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))

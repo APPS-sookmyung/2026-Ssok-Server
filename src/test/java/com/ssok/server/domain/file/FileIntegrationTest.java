@@ -47,6 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest(properties = "file.cleanup.enabled=false")
 @AutoConfigureMockMvc
 class FileIntegrationTest {
+    @Autowired private com.ssok.server.domain.auth.service.SessionService testSessions;
     private static final Path ROOT = Path.of(System.getProperty("java.io.tmpdir"), "ssok-files-" + UUID.randomUUID());
     private static final byte[] PDF = "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF".getBytes(StandardCharsets.US_ASCII);
     @DynamicPropertySource
@@ -115,7 +116,7 @@ class FileIntegrationTest {
         mvc.perform(get("/api/files/{id}", fileId).with(as(viewer)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.libraryId").value(libraryId))
                 .andExpect(jsonPath("$.data.storageId").doesNotExist()).andExpect(jsonPath("$.data.objectKey").doesNotExist());
-        mvc.perform(get("/api/files/{id}/download", fileId).header("Authorization", "Bearer " + tokens.generateAccessToken(viewer.getId())))
+        mvc.perform(get("/api/files/{id}/download", fileId).header("Authorization", "Bearer " + testSessions.open(viewer.getId()).accessToken()))
                 .andExpect(status().isOk()).andExpect(content().bytes(PDF))
                 .andExpect(header().string("Content-Type", "application/pdf"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))

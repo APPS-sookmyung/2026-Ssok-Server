@@ -25,6 +25,27 @@ public class UserController {
 
     private final UserService userService;
 
+    @org.springframework.web.bind.annotation.GetMapping("/me")
+    public ApiResponse<com.ssok.server.domain.user.dto.UserMeResponse> me(Authentication authentication) {
+        return ApiResponse.success(200, "user retrieved", userService.me(userId(authentication)));
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/me/onboarding")
+    public ApiResponse<com.ssok.server.domain.user.dto.OnboardingResponse> onboarding(Authentication authentication) {
+        return ApiResponse.success(200, "onboarding retrieved", userService.onboarding(userId(authentication)));
+    }
+
+    @PutMapping("/me/onboarding")
+    public ApiResponse<com.ssok.server.domain.user.dto.OnboardingResponse> onboarding(Authentication authentication,
+            @RequestBody @Valid com.ssok.server.domain.user.dto.OnboardingRequest request) {
+        return ApiResponse.success(200, "onboarding saved", userService.submitOnboarding(userId(authentication), request));
+    }
+
+    private Long userId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long id)) throw new UnauthenticatedException("authentication required");
+        return id;
+    }
+
     @Operation(summary = "개인정보 설정", description = "개인정보 설정")
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<ProfileUpdateResponse>> updateProfile(

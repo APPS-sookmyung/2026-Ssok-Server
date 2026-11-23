@@ -45,6 +45,10 @@ public class SpaceInvitation {
 
     public void accept() { status = Status.ACCEPTED; }
     public void cancel() { status = Status.CANCELLED; }
+    public void anonymizeRecipient(String replacement) {
+        email = replacement;
+        if (status == Status.PENDING) status = Status.CANCELLED;
+    }
     public void reissue(String hash, Instant expiresAt) {
         this.tokenHash = hash;
         this.expiresAt = expiresAt;

@@ -31,6 +31,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @Transactional
 class TagControllerTest {
+    @Autowired private com.ssok.server.domain.auth.service.SessionService testSessions;
 
     @Autowired
     private WebApplicationContext context;
@@ -63,7 +64,7 @@ class TagControllerTest {
                 Space.builder().name("태그 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
         spaceMemberRepository.save(SpaceMember.builder().space(space).user(owner).role(SpaceRole.OWNER).build());
 
-        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        String accessToken = testSessions.open(owner.getId()).accessToken();
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))

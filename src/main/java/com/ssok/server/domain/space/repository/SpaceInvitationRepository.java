@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface SpaceInvitationRepository extends JpaRepository<SpaceInvitation, Long> {
+    List<SpaceInvitation> findAllByEmailIgnoreCase(String email);
     Optional<SpaceInvitation> findByTokenHash(String hash);
     Optional<SpaceInvitation> findByIdAndSpaceId(Long id, Long spaceId);
     List<SpaceInvitation> findAllBySpaceIdOrderByIdDesc(Long spaceId);

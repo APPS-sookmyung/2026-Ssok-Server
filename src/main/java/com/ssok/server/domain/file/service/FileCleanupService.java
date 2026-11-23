@@ -28,7 +28,7 @@ public class FileCleanupService {
 
     @Transactional
     public void enqueue(StoredFile file) {
-        FileDeletionJob job = jobs.saveAndFlush(new FileDeletionJob(file.getStorageId(), file.getObjectKey(), Instant.now()));
+        FileDeletionJob job = jobs.saveAndFlush(new FileDeletionJob(file.getStorageId(), file.getObjectKey(), Instant.EPOCH));
         events.publishEvent(new FileCleanupRequested(job.getId()));
     }
 }

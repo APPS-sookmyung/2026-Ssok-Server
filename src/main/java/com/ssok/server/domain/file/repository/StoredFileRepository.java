@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface StoredFileRepository extends JpaRepository<StoredFile, Long> {
     Optional<StoredFile> findByBookmarkId(Long bookmarkId);
     List<StoredFile> findAllBySpaceId(Long spaceId);
+    List<StoredFile> findAllByUploaderId(Long uploaderId);
 }

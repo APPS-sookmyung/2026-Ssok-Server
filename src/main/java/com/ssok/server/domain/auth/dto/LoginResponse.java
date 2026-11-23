@@ -14,6 +14,7 @@ public record LoginResponse(
         Long userId,
 
         @Schema(description = "닉네임", example = "홍예빈")
-        String nickname
+        String nickname,
+        boolean onboardingCompleted
 ) {
 }

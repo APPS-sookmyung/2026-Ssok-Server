@@ -22,7 +22,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final SessionService sessions;
     private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional
@@ -63,9 +63,8 @@ public class AuthService {
         events.publishEvent(new com.ssok.server.domain.notification.event.UserReturnedAfterAbsence(user.getId(), user.getLastLoginAt()));
         user.recordLogin(java.time.Instant.now());
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        var pair = sessions.open(user.getId());
 
-        return new LoginResponse(accessToken, refreshToken, user.getId(), user.getName());
+        return new LoginResponse(pair.accessToken(), pair.refreshToken(), user.getId(), user.getName(), user.getOnboardingCompletedAt() != null);
     }
 }

@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(AccountDeletionConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountConflict(AccountDeletionConflictException e) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, e.getMessage()));
+    }
     @ExceptionHandler(NotificationNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotificationNotFound(NotificationNotFoundException e) {
         return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
