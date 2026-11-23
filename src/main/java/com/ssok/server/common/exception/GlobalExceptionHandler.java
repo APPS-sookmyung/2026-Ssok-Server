@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(InvitationConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvitationConflict(InvitationConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(409, e.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateSpaceMemberException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateSpaceMember(DuplicateSpaceMemberException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

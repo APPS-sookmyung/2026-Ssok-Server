@@ -36,7 +36,7 @@ class SpaceMemberServiceTest {
 
     @BeforeEach
     void setUp() {
-        spaceMemberService = new SpaceMemberService(spaceRepository, spaceMemberRepository, userRepository,
+        spaceMemberService = new SpaceMemberService(spaceRepository, spaceMemberRepository,
                 new SpaceAccessService(spaceMemberRepository, spaceRepository));
     }
 

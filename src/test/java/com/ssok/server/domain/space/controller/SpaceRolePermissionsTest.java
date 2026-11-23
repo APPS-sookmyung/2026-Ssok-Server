@@ -209,9 +209,14 @@ class SpaceRolePermissionsTest {
 
     @Test
     void invitationDefaultsToEditorAndMissingTargetDoesNotChangeRoles() throws Exception {
-        mvc.perform(post("/api/spaces/{id}/invite", space.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
+        var result = mvc.perform(post("/api/spaces/{id}/invite", space.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"outsider@roles.test\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated()).andReturn();
+        assertThat(members.findBySpaceIdAndUserId(space.getId(), outsider.getId())).isEmpty();
+        String url = com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.invitationUrl");
+        mvc.perform(post("/api/spaces/invitations/accept").with(as(outsider)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + url.substring(url.indexOf("#token=") + 7) + "\"}"))
+                .andExpect(status().isOk());
         assertThat(members.findBySpaceIdAndUserId(space.getId(), outsider.getId()).orElseThrow().getRole())
                 .isEqualTo(SpaceRole.EDITOR);
         mvc.perform(patch("/api/spaces/{spaceId}/members/{memberId}/role", space.getId(), Long.MAX_VALUE)

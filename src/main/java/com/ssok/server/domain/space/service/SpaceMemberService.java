@@ -1,21 +1,21 @@
 package com.ssok.server.domain.space.service;
 
-import com.ssok.server.common.exception.DuplicateSpaceMemberException;
+
 import com.ssok.server.common.exception.ForbiddenException;
 import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.MemberNotFoundException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
-import com.ssok.server.common.exception.UserNotFoundException;
+
 import com.ssok.server.domain.space.dto.MemberDto;
-import com.ssok.server.domain.space.dto.MemberInviteResponse;
+
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceMember;
 import com.ssok.server.domain.space.entity.SpaceRole;
 import com.ssok.server.domain.space.entity.SpaceType;
 import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
-import com.ssok.server.domain.user.entity.User;
-import com.ssok.server.domain.user.repository.UserRepository;
+
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,51 +27,8 @@ public class SpaceMemberService {
 
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
-    private final UserRepository userRepository;
+
     private final SpaceAccessService spaceAccessService;
-
-    @Transactional
-    public MemberInviteResponse invite(
-            Long requesterId,
-            Long spaceId,
-            String email
-    ) {
-        Space space = spaceRepository.findLockedById(spaceId)
-                .orElseThrow(() ->
-                        new SpaceNotFoundException("space not found"));
-
-        spaceAccessService.requireOwner(requesterId, spaceId, "only owner can invite members");
-
-        if (space.getType() != SpaceType.TEAM) {
-            throw new ForbiddenException(
-                    "members can only be invited to team spaces");
-        }
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new UserNotFoundException("user not found"));
-
-        if (spaceMemberRepository.existsBySpaceIdAndUserId(
-                spaceId,
-                user.getId()
-        )) {
-            throw new DuplicateSpaceMemberException(
-                    "user is already a member");
-        }
-
-        SpaceMember member = SpaceMember.builder()
-                .space(space)
-                .user(user)
-                .role(SpaceRole.EDITOR)
-                .build();
-
-        SpaceMember saved = spaceMemberRepository.save(member);
-
-        return new MemberInviteResponse(
-                saved.getId(),
-                user.getEmail()
-        );
-    }
 
     @Transactional(readOnly = true)
     public List<MemberDto> list(Long userId, Long spaceId) {
