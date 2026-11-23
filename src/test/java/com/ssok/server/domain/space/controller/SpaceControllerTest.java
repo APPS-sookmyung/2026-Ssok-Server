@@ -47,7 +47,7 @@ class SpaceControllerTest {
         Space space = Space.builder().type(SpaceType.TEAM).build();
         User user = User.builder().email("member@test.com").build();
         ReflectionTestUtils.setField(user, "id", 2L);
-        when(spaces.findById(10L)).thenReturn(Optional.of(space));
+        when(spaces.findLockedById(10L)).thenReturn(Optional.of(space));
         when(members.findBySpaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(
                 SpaceMember.builder().role(SpaceRole.OWNER).build()));
         when(users.findByEmail("member@test.com")).thenReturn(Optional.of(user));

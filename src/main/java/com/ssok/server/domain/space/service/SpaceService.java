@@ -91,7 +91,7 @@ public class SpaceService {
 
     @Transactional
     public void delete(Long userId, Long spaceId) {
-        Space space = spaceRepository.findById(spaceId)
+        Space space = spaceRepository.findLockedById(spaceId)
                 .orElseThrow(() ->
                         new SpaceNotFoundException("space not found"));
 

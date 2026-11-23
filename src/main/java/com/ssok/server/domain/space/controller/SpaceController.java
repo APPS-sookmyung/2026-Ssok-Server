@@ -6,6 +6,7 @@ import com.ssok.server.domain.space.dto.MemberDto;
 import com.ssok.server.domain.space.dto.MemberInviteRequest;
 import com.ssok.server.domain.space.dto.MemberInviteResponse;
 import com.ssok.server.domain.space.dto.MemberRoleUpdateRequest;
+import com.ssok.server.domain.space.dto.OwnershipTransferRequest;
 import com.ssok.server.domain.space.dto.SpaceCreateRequest;
 import com.ssok.server.domain.space.dto.SpaceCreateResponse;
 import com.ssok.server.domain.space.dto.SpaceDetailResponse;
@@ -164,6 +165,21 @@ public class SpaceController {
             @RequestBody @Valid MemberRoleUpdateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "member role updated successfully",
                 spaceMemberService.updateRole(requireUserId(authentication), spaceId, memberId, request.role())));
+    }
+
+    @Operation(summary = "팀 스페이스 탈퇴", description = "EDITOR·VIEWER 직접 탈퇴. OWNER는 소유권 이전 후 가능")
+    @DeleteMapping("/{spaceId}/members/me")
+    public ResponseEntity<ApiResponse<Boolean>> leave(Authentication authentication, @PathVariable Long spaceId) {
+        spaceMemberService.leave(requireUserId(authentication), spaceId);
+        return ResponseEntity.ok(ApiResponse.success(200, "space left successfully", true));
+    }
+
+    @Operation(summary = "팀 스페이스 소유권 이전", description = "OWNER가 기존 팀원에게 이전. 기존 OWNER는 EDITOR로 변경")
+    @PatchMapping("/{spaceId}/owner")
+    public ResponseEntity<ApiResponse<MemberDto>> transferOwnership(Authentication authentication,
+            @PathVariable Long spaceId, @RequestBody @Valid OwnershipTransferRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(200, "ownership transferred successfully",
+                spaceMemberService.transferOwnership(requireUserId(authentication), spaceId, request.memberId())));
     }
 
     private Long requireUserId(Authentication authentication) {

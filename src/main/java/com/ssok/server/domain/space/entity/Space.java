@@ -59,6 +59,10 @@ public class Space {
     // 스페이스 삭제 시 북마크와 그 태그 컬렉션까지 DB에서 제거한다.
     private List<Bookmark> bookmarks = new ArrayList<>();
 
+    public void transferOwnership(User newOwner) {
+        this.owner = newOwner;
+    }
+
     @Builder
     public Space(
             String name,

@@ -230,6 +230,74 @@ class SpaceRolePermissionsTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @ParameterizedTest
+    @EnumSource(value = SpaceRole.class, names = {"EDITOR", "VIEWER"})
+    void membersCanLeaveWithoutDeletingTeamMaterials(SpaceRole role) throws Exception {
+        User user = actor(role);
+        mvc.perform(delete("/api/spaces/{id}/members/me", space.getId()).with(as(user)))
+                .andExpect(status().isOk());
+        members.flush();
+        assertThat(members.findBySpaceIdAndUserId(space.getId(), user.getId())).isEmpty();
+        assertThat(bookmarks.existsById(bookmark.getId())).isTrue();
+        mvc.perform(get("/api/bookmarks/{id}", bookmark.getId()).with(as(user)))
+                .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SpaceRole.class, names = {"EDITOR", "VIEWER"})
+    void ownerCanTransferThenLeaveAndNewOwnerCanManage(SpaceRole role) throws Exception {
+        SpaceMember target = role == SpaceRole.EDITOR ? editorMembership : viewerMembership;
+        User nextOwner = actor(role);
+        mvc.perform(patch("/api/spaces/{id}/owner", space.getId()).with(as(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"memberId\":" + target.getId() + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.role").value("OWNER"));
+        members.flush();
+        assertThat(spaces.findById(space.getId()).orElseThrow().getOwner().getId()).isEqualTo(nextOwner.getId());
+        assertThat(ownerMembership.getRole()).isEqualTo(SpaceRole.EDITOR);
+        assertThat(members.findAllBySpaceId(space.getId()).stream().filter(m -> m.getRole() == SpaceRole.OWNER))
+                .hasSize(1);
+        mvc.perform(delete("/api/spaces/{id}", space.getId()).with(as(owner))).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/spaces/{id}/members/me", space.getId()).with(as(owner))).andExpect(status().isOk());
+        mvc.perform(delete("/api/spaces/{id}", space.getId()).with(as(nextOwner))).andExpect(status().isOk());
+    }
+
+    @Test
+    void ownerCannotLeaveOrTransferToSelfAndInvalidTargetsDoNotChangeOwner() throws Exception {
+        mvc.perform(delete("/api/spaces/{id}/members/me", space.getId()).with(as(owner))).andExpect(status().isForbidden());
+        mvc.perform(patch("/api/spaces/{id}/owner", space.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + ownerMembership.getId() + "}")).andExpect(status().isBadRequest());
+        Space other = spaces.save(Space.builder().name("other").type(SpaceType.TEAM).owner(outsider).build());
+        SpaceMember foreign = membership(other, outsider, SpaceRole.OWNER);
+        mvc.perform(patch("/api/spaces/{id}/owner", space.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + foreign.getId() + "}")).andExpect(status().isNotFound());
+        assertThat(space.getOwner()).isEqualTo(owner);
+        assertThat(ownerMembership.getRole()).isEqualTo(SpaceRole.OWNER);
+    }
+
+    @Test
+    void personalSpaceCannotBeLeftOrTransferredButCanBeDeleted() throws Exception {
+        Space personal = spaces.save(Space.builder().name("personal").type(SpaceType.PERSONAL).owner(owner).build());
+        membership(personal, owner, SpaceRole.OWNER);
+        mvc.perform(delete("/api/spaces/{id}/members/me", personal.getId()).with(as(owner))).andExpect(status().isForbidden());
+        mvc.perform(patch("/api/spaces/{id}/owner", personal.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + editorMembership.getId() + "}")).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/spaces/{id}", personal.getId()).with(as(owner))).andExpect(status().isOk());
+    }
+
+    @Test
+    void lifecycleRequiresMembershipOwnerAndValidBody() throws Exception {
+        for (User user : List.of(editor, viewer, outsider)) {
+            mvc.perform(patch("/api/spaces/{id}/owner", space.getId()).with(as(user)).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"memberId\":" + editorMembership.getId() + "}")).andExpect(status().isForbidden());
+        }
+        mvc.perform(delete("/api/spaces/{id}/members/me", space.getId()).with(as(outsider))).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/spaces/{id}/members/me", space.getId())).andExpect(status().isUnauthorized());
+        for (String body : List.of("{}", "{\"memberId\":null}", "{\"memberId\":0}")) {
+            mvc.perform(patch("/api/spaces/{id}/owner", space.getId()).with(as(owner)).contentType(MediaType.APPLICATION_JSON)
+                    .content(body)).andExpect(status().isBadRequest());
+        }
+    }
+
     private User actor(SpaceRole role) {
         return switch (role) { case OWNER -> owner; case EDITOR -> editor; case VIEWER -> viewer; };
     }

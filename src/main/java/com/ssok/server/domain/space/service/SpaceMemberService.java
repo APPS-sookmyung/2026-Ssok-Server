@@ -36,7 +36,7 @@ public class SpaceMemberService {
             Long spaceId,
             String email
     ) {
-        Space space = spaceRepository.findById(spaceId)
+        Space space = spaceRepository.findLockedById(spaceId)
                 .orElseThrow(() ->
                         new SpaceNotFoundException("space not found"));
 
@@ -93,9 +93,7 @@ public class SpaceMemberService {
 
     @Transactional
     public void remove(Long requesterId, Long spaceId, Long memberId) {
-        if (!spaceRepository.existsById(spaceId)) {
-            throw new SpaceNotFoundException("space not found");
-        }
+        lockSpace(spaceId);
 
         spaceAccessService.requireOwner(requesterId, spaceId, "only owner can remove members");
 
@@ -114,9 +112,7 @@ public class SpaceMemberService {
 
     @Transactional
     public MemberDto updateRole(Long requesterId, Long spaceId, Long memberId, SpaceRole role) {
-        if (!spaceRepository.existsById(spaceId)) {
-            throw new SpaceNotFoundException("space not found");
-        }
+        lockSpace(spaceId);
         spaceAccessService.requireOwner(requesterId, spaceId, "only owner can change member roles");
         if (role == null || role == SpaceRole.OWNER) {
             throw new InvalidRequestException("role must be EDITOR or VIEWER");
@@ -129,5 +125,44 @@ public class SpaceMemberService {
         target.updateRole(role);
         return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
                 target.getUser().getEmail(), target.getRole().name());
+    }
+
+    @Transactional
+    public void leave(Long userId, Long spaceId) {
+        Space space = lockSpace(spaceId);
+        SpaceMember member = spaceAccessService.requireMember(userId, spaceId);
+        requireTeam(space);
+        if (member.getRole() == SpaceRole.OWNER) {
+            throw new ForbiddenException("transfer ownership before leaving the space");
+        }
+        spaceMemberRepository.delete(member);
+    }
+
+    @Transactional
+    public MemberDto transferOwnership(Long userId, Long spaceId, Long memberId) {
+        Space space = lockSpace(spaceId);
+        SpaceMember owner = spaceAccessService.requireOwner(userId, spaceId);
+        requireTeam(space);
+        SpaceMember target = spaceMemberRepository.findBySpaceIdAndId(spaceId, memberId)
+                .orElseThrow(() -> new MemberNotFoundException("member not found"));
+        if (target.getId().equals(owner.getId())) {
+            throw new InvalidRequestException("cannot transfer ownership to yourself");
+        }
+        owner.updateRole(SpaceRole.EDITOR);
+        target.updateRole(SpaceRole.OWNER);
+        space.transferOwnership(target.getUser());
+        return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
+                target.getUser().getEmail(), target.getRole().name());
+    }
+
+    private Space lockSpace(Long spaceId) {
+        return spaceRepository.findLockedById(spaceId)
+                .orElseThrow(() -> new SpaceNotFoundException("space not found"));
+    }
+
+    private void requireTeam(Space space) {
+        if (space.getType() != SpaceType.TEAM) {
+            throw new ForbiddenException("personal spaces cannot be left or transferred");
+        }
     }
 }
