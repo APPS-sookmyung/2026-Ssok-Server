@@ -13,6 +13,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.ssok.server.common.exception.AiServerException;
 import com.ssok.server.domain.ai.client.dto.AiAnalyzeRequest;
+import com.ssok.server.domain.ai.client.dto.AiChatRequest;
+import com.ssok.server.domain.ai.client.dto.AiChatResponse;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,6 +88,53 @@ class AiServerClientTest {
 
         assertThatThrownBy(() -> aiServerClient.search("query", 5, List.of(1L)))
                 .isInstanceOf(AiServerException.class);
+    }
+
+    @Test
+    void 대화_검색은_최근_메시지와_space_ids를_보내고_응답을_파싱한다() {
+        server.expect(requestTo("http://ai-server/api/v1/ai/chat"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("""
+                        {
+                          "messages": [
+                            {"role": "user", "content": "그 글"},
+                            {"role": "assistant", "content": "어떤 주제인가요?"},
+                            {"role": "user", "content": "리액트"}
+                          ],
+                          "space_ids": [1, 3],
+                          "top_k": 5
+                        }
+                        """, true))
+                .andRespond(withSuccess("""
+                        {
+                          "reply": "이 글을 찾으시나요?",
+                          "needs_clarification": false,
+                          "results": [{"bookmark_id": 123, "similarity": 0.9}]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        AiChatResponse response = aiServerClient.chat(new AiChatRequest(List.of(
+                new AiChatRequest.Message("user", "그 글"),
+                new AiChatRequest.Message("assistant", "어떤 주제인가요?"),
+                new AiChatRequest.Message("user", "리액트")), List.of(1L, 3L), 5));
+
+        assertThat(response.reply()).isEqualTo("이 글을 찾으시나요?");
+        assertThat(response.needsClarification()).isFalse();
+        assertThat(response.results()).extracting(AiSearchResponse.Result::bookmarkId).containsExactly(123L);
+    }
+
+    @Test
+    void 벡터_스페이스_갱신은_PATCH로_요청한다() {
+        server.expect(requestTo("http://ai-server/api/v1/ai/bookmarks/123"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(content().json("""
+                        {"space_id": 9}
+                        """, true))
+                .andRespond(withNoContent());
+
+        aiServerClient.updateVectorSpace(123L, 9L);
+
+        server.verify();
     }
 
     @Test

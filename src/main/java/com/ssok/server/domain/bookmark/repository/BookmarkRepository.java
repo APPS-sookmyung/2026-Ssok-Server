@@ -27,6 +27,9 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
 
     List<Bookmark> findAllBySpaceIdIn(Collection<Long> spaceIds);
 
+    @EntityGraph(attributePaths = "space")
+    List<Bookmark> findWithSpaceByIdIn(Collection<Long> ids);
+
     @EntityGraph(attributePaths = {"space", "savedBy"})
     Page<Bookmark> findByTagsContainingAndSpaceIdIn(String tag, Collection<Long> spaceIds, Pageable pageable);
 

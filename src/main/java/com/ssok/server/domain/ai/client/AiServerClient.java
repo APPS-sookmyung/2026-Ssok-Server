@@ -2,6 +2,8 @@ package com.ssok.server.domain.ai.client;
 
 import com.ssok.server.common.exception.AiServerException;
 import com.ssok.server.domain.ai.client.dto.AiAnalyzeRequest;
+import com.ssok.server.domain.ai.client.dto.AiChatRequest;
+import com.ssok.server.domain.ai.client.dto.AiChatResponse;
 import com.ssok.server.domain.ai.client.dto.AiSearchRequest;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
 import com.ssok.server.domain.ai.client.dto.AiVectorSpaceUpdateRequest;
@@ -49,6 +51,26 @@ public class AiServerClient {
             return response != null && response.results() != null ? response.results() : List.of();
         } catch (RestClientException e) {
             throw new AiServerException("ai search request failed", e);
+        }
+    }
+
+    /**
+     * 대화 검색. AI가 질문을 해석해 되묻거나 후보 북마크를 찾는다.
+     */
+    public AiChatResponse chat(AiChatRequest request) {
+        try {
+            AiChatResponse response = aiRestClient.post()
+                    .uri("/api/v1/ai/chat")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(AiChatResponse.class);
+            if (response == null || response.reply() == null) {
+                throw new AiServerException("ai chat returned empty response", null);
+            }
+            return response;
+        } catch (RestClientException e) {
+            throw new AiServerException("ai chat request failed", e);
         }
     }
 
