@@ -37,7 +37,7 @@ class SpaceMemberServiceTest {
     @BeforeEach
     void setUp() {
         spaceMemberService = new SpaceMemberService(spaceRepository, spaceMemberRepository,
-                new SpaceAccessService(spaceMemberRepository, spaceRepository));
+                new SpaceAccessService(spaceMemberRepository, spaceRepository), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     @Test
@@ -75,7 +75,7 @@ class SpaceMemberServiceTest {
                 .role(SpaceRole.OWNER)
                 .build();
 
-        SpaceMember target = SpaceMember.builder()
+        SpaceMember target = SpaceMember.builder().user(targetUser())
                 .role(SpaceRole.EDITOR)
                 .build();
 
@@ -107,7 +107,7 @@ class SpaceMemberServiceTest {
                 .role(SpaceRole.OWNER)
                 .build();
 
-        SpaceMember target = SpaceMember.builder()
+        SpaceMember target = SpaceMember.builder().user(targetUser())
                 .role(SpaceRole.OWNER)
                 .build();
 
@@ -160,4 +160,8 @@ class SpaceMemberServiceTest {
         verify(spaceMemberRepository, never())
                 .delete(any(SpaceMember.class));
     }
-}
+    private com.ssok.server.domain.user.entity.User targetUser() {
+        var user = com.ssok.server.domain.user.entity.User.builder().name("target").email("target@test.com").password("test").build();
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 3L);
+        return user;
+    }}

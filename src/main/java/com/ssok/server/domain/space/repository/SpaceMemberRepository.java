@@ -11,6 +11,10 @@ public interface SpaceMemberRepository extends JpaRepository<SpaceMember, Long> 
 
     List<SpaceMember> findAllBySpaceId(Long spaceId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @org.springframework.data.jpa.repository.Query("select m from SpaceMember m where m.space.id = :spaceId")
+    List<SpaceMember> findAllLockedBySpaceId(@org.springframework.data.repository.query.Param("spaceId") Long spaceId);
+
     Optional<SpaceMember> findBySpaceIdAndId(Long spaceId, Long memberId);
 
     boolean existsBySpaceIdAndUserId(Long spaceId, Long userId);

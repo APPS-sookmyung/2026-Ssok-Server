@@ -29,6 +29,7 @@ public class SpaceMemberService {
     private final SpaceMemberRepository spaceMemberRepository;
 
     private final SpaceAccessService spaceAccessService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public List<MemberDto> list(Long userId, Long spaceId) {
@@ -65,6 +66,8 @@ public class SpaceMemberService {
         }
 
         spaceMemberRepository.delete(target);
+        events.publishEvent(com.ssok.server.domain.notification.event.SpaceNotificationEvent.member(
+                com.ssok.server.domain.notification.entity.NotificationType.MEMBER_REMOVED, requesterId, target.getUser().getId(), spaceId));
     }
 
     @Transactional
@@ -79,7 +82,11 @@ public class SpaceMemberService {
         if (target.getRole() == SpaceRole.OWNER) {
             throw new ForbiddenException("owner role cannot be changed");
         }
-        target.updateRole(role);
+        if (target.getRole() != role) {
+            target.updateRole(role);
+            events.publishEvent(com.ssok.server.domain.notification.event.SpaceNotificationEvent.member(
+                    com.ssok.server.domain.notification.entity.NotificationType.MEMBER_ROLE_CHANGED, requesterId, target.getUser().getId(), spaceId));
+        }
         return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
                 target.getUser().getEmail(), target.getRole().name());
     }
@@ -93,6 +100,8 @@ public class SpaceMemberService {
             throw new ForbiddenException("transfer ownership before leaving the space");
         }
         spaceMemberRepository.delete(member);
+        events.publishEvent(com.ssok.server.domain.notification.event.SpaceNotificationEvent.member(
+                com.ssok.server.domain.notification.entity.NotificationType.MEMBER_LEFT, userId, space.getOwner().getId(), spaceId));
     }
 
     @Transactional
@@ -108,6 +117,8 @@ public class SpaceMemberService {
         owner.updateRole(SpaceRole.EDITOR);
         target.updateRole(SpaceRole.OWNER);
         space.transferOwnership(target.getUser());
+        events.publishEvent(com.ssok.server.domain.notification.event.SpaceNotificationEvent.member(
+                com.ssok.server.domain.notification.entity.NotificationType.OWNERSHIP_TRANSFERRED, userId, target.getUser().getId(), spaceId));
         return new MemberDto(target.getId(), target.getUser().getId(), target.getUser().getName(),
                 target.getUser().getEmail(), target.getRole().name());
     }

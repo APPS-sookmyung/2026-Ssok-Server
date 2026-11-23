@@ -38,7 +38,7 @@ class SpaceControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new SpaceController(
                         new SpaceService(spaces, members, bookmarks, users, new SpaceAccessService(members, spaces),
                                 mock(com.ssok.server.domain.file.service.FileCleanupService.class)),
-                        new SpaceMemberService(spaces, members, new SpaceAccessService(members, spaces))))
+                        new SpaceMemberService(spaces, members, new SpaceAccessService(members, spaces), mock(org.springframework.context.ApplicationEventPublisher.class))))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

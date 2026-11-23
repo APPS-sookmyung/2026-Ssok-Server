@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotificationNotFound(NotificationNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
 
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleFileNotFound(FileNotFoundException e) {

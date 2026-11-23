@@ -74,7 +74,7 @@ public class SpaceInvitationService {
         }
         String token = token();
         SpaceInvitation invitation = invitations.saveAndFlush(new SpaceInvitation(space, email, role, hash(token), now, now.plus(ttl)));
-        return publish(invitation, token);
+        return publish(invitation, token, userId);
     }
 
     @Transactional(readOnly = true)
@@ -108,7 +108,7 @@ public class SpaceInvitationService {
         String token = token();
         invitation.reissue(hash(token), Instant.now().plus(ttl));
         invitations.flush();
-        return publish(invitation, token);
+        return publish(invitation, token, userId);
     }
 
     @Transactional
@@ -133,6 +133,9 @@ public class SpaceInvitationService {
         if (members.existsBySpaceIdAndUserId(spaceId, userId)) throw new DuplicateSpaceMemberException("user is already a member");
         SpaceMember member = members.save(SpaceMember.builder().space(invitation.getSpace()).user(user).role(invitation.getRole()).build());
         invitation.accept();
+        events.publishEvent(new com.ssok.server.domain.notification.event.SpaceNotificationEvent(
+                com.ssok.server.domain.notification.entity.NotificationType.INVITATION_ACCEPTED, userId,
+                invitation.getSpace().getOwner().getId(), spaceId, invitation.getId(), "INVITATION_ACCEPTED:" + invitation.getId()));
         return new MemberDto(member.getId(), userId, user.getName(), user.getEmail(), member.getRole().name());
     }
 
@@ -147,10 +150,14 @@ public class SpaceInvitationService {
         return invitations.findByIdAndSpaceId(id, spaceId).orElseThrow(() -> new MemberNotFoundException("invitation not found"));
     }
 
-    private InvitationResponse publish(SpaceInvitation invitation, String token) {
+    private InvitationResponse publish(SpaceInvitation invitation, String token, Long actorId) {
         // 프론트는 fragment에서 토큰을 읽고 POST body로 전달한다. URL 접근 로그에 토큰을 남기지 않는다.
         String url = acceptUrl + "#token=" + token;
         events.publishEvent(new InvitationMailRequested(invitation.getId(), invitation.getTokenHash(), invitation.getEmail(), url));
+        users.findByEmail(invitation.getEmail()).ifPresent(recipient -> events.publishEvent(
+                new com.ssok.server.domain.notification.event.SpaceNotificationEvent(
+                        com.ssok.server.domain.notification.entity.NotificationType.INVITATION_RECEIVED, actorId, recipient.getId(),
+                        invitation.getSpace().getId(), invitation.getId(), "INVITATION_RECEIVED:" + invitation.getId())));
         return InvitationResponse.from(invitation, url);
     }
 

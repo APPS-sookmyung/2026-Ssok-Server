@@ -39,6 +39,11 @@ public class User {
     @Column
     private LocalDateTime updatedAt;
 
+    @Column
+    private java.time.Instant lastLoginAt;
+
+    public void recordLogin(java.time.Instant now) { lastLoginAt = now; }
+
     @Builder
     public User(String email, String password, String name) {
         this.email = email;
