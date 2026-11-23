@@ -153,12 +153,9 @@ class BookmarkAiFlowTest {
     void 재분석_후_이전_요청의_콜백은_무시한다() throws Exception {
         Long bookmarkId = saveBookmark();
         String oldRequestId = currentRequestId(bookmarkId);
+        sendCallback(failureBody(bookmarkId, oldRequestId)).andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/ai/summary")
-                        .with(loginAs(ownerId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"bookmarkId\": %d}".formatted(bookmarkId)))
-                .andExpect(status().isAccepted());
+        requestReanalysis(bookmarkId).andExpect(status().isAccepted());
         String newRequestId = currentRequestId(bookmarkId);
         assertThat(newRequestId).isNotEqualTo(oldRequestId);
 
@@ -169,6 +166,49 @@ class BookmarkAiFlowTest {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId).orElseThrow();
         assertThat(bookmark.getAnalysisStatus()).isEqualTo(AnalysisStatus.PENDING);
         assertThat(bookmark.getTitle()).isEqualTo("example.com");
+    }
+
+    @Test
+    void 분석_중에_재분석을_요청하면_새로_요청하지_않는다() throws Exception {
+        Long bookmarkId = saveBookmark();
+        String requestId = currentRequestId(bookmarkId);
+
+        requestReanalysis(bookmarkId)
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.analysisStatus").value("PENDING"));
+
+        assertThat(currentRequestId(bookmarkId)).isEqualTo(requestId);
+    }
+
+    @Test
+    void 분석_상태를_여러_개_한꺼번에_확인한다() throws Exception {
+        Long done = saveBookmark();
+        Long pending = saveBookmark();
+        sendCallback(successBody(done, currentRequestId(done), "완료된 글")).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/bookmarks/analysis-status")
+                        .param("ids", done + "," + pending + ",999999")
+                        .with(loginAs(ownerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[?(@.bookmarkId==%d)].analysisStatus".formatted(done)).value("SUCCESS"))
+                .andExpect(jsonPath("$.data[?(@.bookmarkId==%d)].title".formatted(done)).value("완료된 글"))
+                .andExpect(jsonPath("$.data[?(@.bookmarkId==%d)].analysisStatus".formatted(pending)).value("PENDING"));
+    }
+
+    @Test
+    void 볼_수_없는_북마크의_상태는_빠지고_ID가_너무_많으면_400이다() throws Exception {
+        Long bookmarkId = saveBookmark();
+
+        mockMvc.perform(get("/api/bookmarks/analysis-status").param("ids", String.valueOf(bookmarkId))
+                        .with(loginAs(outsiderId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        String tooMany = java.util.stream.LongStream.rangeClosed(1, 51)
+                .mapToObj(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        mockMvc.perform(get("/api/bookmarks/analysis-status").param("ids", tooMany).with(loginAs(ownerId)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -331,6 +371,13 @@ class BookmarkAiFlowTest {
 
         assertThat(bookmarkRepository.existsById(bookmarkId)).isFalse();
         assertThat(vectorSyncTaskRepository.findAllByBookmarkIdIn(List.of(bookmarkId))).hasSize(1);
+    }
+
+    private ResultActions requestReanalysis(Long bookmarkId) throws Exception {
+        return mockMvc.perform(post("/api/ai/summary")
+                .with(loginAs(ownerId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"bookmarkId\": %d}".formatted(bookmarkId)));
     }
 
     private ResultActions sendCallback(String body) throws Exception {

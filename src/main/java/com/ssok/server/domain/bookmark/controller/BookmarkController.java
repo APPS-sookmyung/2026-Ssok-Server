@@ -2,6 +2,7 @@ package com.ssok.server.domain.bookmark.controller;
 
 import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.response.ApiResponse;
+import com.ssok.server.domain.bookmark.dto.AnalysisStatusDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkBulkDeleteRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkBulkResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
@@ -77,6 +78,18 @@ public class BookmarkController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "recent bookmarks retrieved successfully", response));
+    }
+
+    @Operation(summary = "분석 상태 확인",
+            description = "저장 직후(202) 분석이 끝났는지 확인. PENDING인 카드가 있는 동안 3초 간격으로 호출하고, "
+                    + "SUCCESS·FAILED가 되면 멈춘다. 한 번에 최대 50개. 삭제됐거나 볼 수 없는 북마크는 결과에서 빠짐")
+    @GetMapping("/analysis-status")
+    public ResponseEntity<ApiResponse<List<AnalysisStatusDto>>> analysisStatuses(
+            @Parameter(description = "북마크 ID 목록 (쉼표 구분)", example = "15,16,17") @RequestParam List<Long> ids,
+            Authentication authentication) {
+        List<AnalysisStatusDto> response = bookmarkService.analysisStatuses(requireUserId(authentication), ids);
+
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "analysis statuses retrieved", response));
     }
 
     @Operation(summary = "저장 여부 확인",

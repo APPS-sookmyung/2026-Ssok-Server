@@ -1,5 +1,6 @@
 package com.ssok.server.domain.ai.service;
 
+import com.ssok.server.common.config.AiServerProperties;
 import com.ssok.server.common.exception.BookmarkNotFoundException;
 import com.ssok.server.domain.ai.client.AiServerClient;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
@@ -31,12 +32,18 @@ public class AiService {
     private final AiServerClient aiServerClient;
     private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AiServerProperties aiServerProperties;
 
     @Transactional
     public SummaryResponse summarize(Long userId, Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
         spaceAccessService.validateMember(bookmark.getSpace().getId(), userId);
+
+        // 이미 분석 중이면 AI를 다시 부르지 않는다 (버튼 연타·중복 요청 방지).
+        if (bookmark.isAnalysisInProgress(aiServerProperties.analysisTimeout())) {
+            return new SummaryResponse(bookmark.getId(), bookmark.getAnalysisStatus());
+        }
 
         bookmark.requestAnalysis();
         eventPublisher.publishEvent(BookmarkAnalysisRequestedEvent.from(bookmark));

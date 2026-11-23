@@ -6,6 +6,7 @@ import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.util.TimeFormatter;
 import com.ssok.server.domain.ai.vector.VectorSyncService;
+import com.ssok.server.domain.bookmark.dto.AnalysisStatusDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkBulkResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
@@ -43,6 +44,7 @@ public class BookmarkService {
 
     public static final int MAX_PAGE_SIZE = 100;
     public static final int MAX_RECENT_SIZE = 50;
+    public static final int MAX_STATUS_IDS = 50;
 
     private final BookmarkRepository bookmarkRepository;
     private final SpaceRepository spaceRepository;
@@ -104,6 +106,22 @@ public class BookmarkService {
 
         return toSummaries(bookmarkRepository.findBySpaceIdIn(
                 spaceIds, PageRequest.of(0, size, BookmarkSort.LATEST.toSort())).getContent());
+    }
+
+    /**
+     * 여러 북마크의 분석 상태. 삭제됐거나 볼 수 없는 북마크는 결과에서 빠진다(오류로 처리하지 않음).
+     */
+    @Transactional(readOnly = true)
+    public List<AnalysisStatusDto> analysisStatuses(Long userId, List<Long> bookmarkIds) {
+        if (bookmarkIds.isEmpty() || bookmarkIds.size() > MAX_STATUS_IDS) {
+            throw new InvalidRequestException("ids must contain 1 to " + MAX_STATUS_IDS + " bookmark ids");
+        }
+        Set<Long> spaceIds = spaceAccessService.getAccessibleSpaceIds(userId);
+
+        return bookmarkRepository.findWithSpaceByIdIn(new HashSet<>(bookmarkIds)).stream()
+                .filter(bookmark -> spaceIds.contains(bookmark.getSpace().getId()))
+                .map(AnalysisStatusDto::from)
+                .toList();
     }
 
     /**
