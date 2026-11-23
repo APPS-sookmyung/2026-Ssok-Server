@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.ssok.server.common.exception.GlobalExceptionHandler;
-import com.ssok.server.domain.ai.vector.VectorDeletionService;
+import com.ssok.server.domain.ai.vector.VectorSyncService;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.*;
 import com.ssok.server.domain.space.repository.*;
@@ -30,7 +30,7 @@ class SpaceControllerTest {
     private final SpaceMemberRepository members = mock(SpaceMemberRepository.class);
     private final UserRepository users = mock(UserRepository.class);
     private final BookmarkRepository bookmarks = mock(BookmarkRepository.class);
-    private final VectorDeletionService vectorDeletions = mock(VectorDeletionService.class);
+    private final VectorSyncService vectorSyncs = mock(VectorSyncService.class);
     private final UsernamePasswordAuthenticationToken authentication =
             new UsernamePasswordAuthenticationToken(1L, null, List.of());
     private MockMvc mvc;
@@ -38,7 +38,7 @@ class SpaceControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new SpaceController(
-                        new SpaceService(spaces, members, bookmarks, users, vectorDeletions),
+                        new SpaceService(spaces, members, bookmarks, users, vectorSyncs),
                         new SpaceMemberService(spaces, members, users)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

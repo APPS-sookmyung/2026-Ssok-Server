@@ -1,23 +1,32 @@
 package com.ssok.server.domain.bookmark.service;
 
 import com.ssok.server.common.exception.BookmarkNotFoundException;
-import com.ssok.server.common.exception.ForbiddenException;
+import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
+import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.util.TimeFormatter;
-import com.ssok.server.domain.ai.vector.VectorDeletionService;
+import com.ssok.server.domain.ai.vector.VectorSyncService;
+import com.ssok.server.domain.bookmark.dto.BookmarkBulkResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveResponse;
+import com.ssok.server.domain.bookmark.dto.BookmarkSaverDto;
+import com.ssok.server.domain.bookmark.dto.BookmarkSort;
 import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.event.BookmarkAnalysisRequestedEvent;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
-import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
+import com.ssok.server.domain.space.service.SpaceAccessService;
+import com.ssok.server.domain.user.entity.User;
+import com.ssok.server.domain.user.repository.UserRepository;
 import java.net.URI;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -29,22 +38,29 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BookmarkService {
 
+    public static final int MAX_PAGE_SIZE = 100;
+    public static final int MAX_RECENT_SIZE = 50;
+
     private final BookmarkRepository bookmarkRepository;
     private final SpaceRepository spaceRepository;
-    private final SpaceMemberRepository spaceMemberRepository;
+    private final UserRepository userRepository;
+    private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
-    private final VectorDeletionService vectorDeletionService;
+    private final VectorSyncService vectorSyncService;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
         Space space = spaceRepository.findById(request.spaceId())
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
-        validateSpaceMember(space.getId(), userId);
+        spaceAccessService.validateMember(space.getId(), userId);
+        User saver = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthenticatedException("authentication required"));
 
         Bookmark bookmark = Bookmark.builder()
                 .url(request.url())
                 .title(extractHost(request.url()))
                 .space(space)
+                .savedBy(saver)
                 .build();
 
         Bookmark saved = bookmarkRepository.saveAndFlush(bookmark);
@@ -55,38 +71,79 @@ public class BookmarkService {
     }
 
     @Transactional(readOnly = true)
-    public BookmarkListResponse list(Long userId, Long spaceId, int page, int size) {
-        if (!spaceRepository.existsById(spaceId)) {
-            throw new SpaceNotFoundException("space not found");
-        }
-        validateSpaceMember(spaceId, userId);
+    public BookmarkListResponse list(Long userId, Long spaceId, int page, int size, String sort) {
+        validatePage(page, size, MAX_PAGE_SIZE);
+        BookmarkSort bookmarkSort = BookmarkSort.from(sort);
+        spaceAccessService.validateMember(spaceId, userId);
 
-        Page<Bookmark> result = bookmarkRepository.findAllBySpaceId(spaceId, PageRequest.of(page, size));
-
-        List<BookmarkSummaryDto> content = result.getContent().stream()
-                .map(bookmark -> new BookmarkSummaryDto(
-                        bookmark.getId(),
-                        bookmark.getTitle(),
-                        bookmark.getSummary(),
-                        bookmark.getVisitCount(),
-                        bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
-                        bookmark.getCategory(),
-                        bookmark.getAnalysisStatus(),
-                        bookmark.getTags()))
-                .toList();
+        Page<Bookmark> result = bookmarkRepository.findAllBySpaceId(
+                spaceId, PageRequest.of(page, size, bookmarkSort.toSort()));
 
         return new BookmarkListResponse(
-                content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+                result.getContent().stream().map(BookmarkSummaryDto::from).toList(),
+                result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+    }
+
+    /**
+     * 내가 속한 모든 스페이스(개인 + 소속 팀)에서 최근 저장된 북마크.
+     */
+    @Transactional(readOnly = true)
+    public List<BookmarkSummaryDto> recent(Long userId, int size) {
+        validatePage(0, size, MAX_RECENT_SIZE);
+        Set<Long> spaceIds = spaceAccessService.getAccessibleSpaceIds(userId);
+        if (spaceIds.isEmpty()) {
+            return List.of();
+        }
+
+        return bookmarkRepository.findBySpaceIdIn(spaceIds, PageRequest.of(0, size, BookmarkSort.LATEST.toSort()))
+                .stream()
+                .map(BookmarkSummaryDto::from)
+                .toList();
     }
 
     @Transactional
     public void delete(Long userId, Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
-        validateSpaceMember(bookmark.getSpace().getId(), userId);
+        spaceAccessService.validateMember(bookmark.getSpace().getId(), userId);
 
         bookmarkRepository.delete(bookmark);
-        vectorDeletionService.enqueue(List.of(bookmarkId));
+        vectorSyncService.enqueueDeletion(List.of(bookmarkId));
+    }
+
+    /**
+     * 여러 북마크를 한 번에 삭제한다. 하나라도 없거나 권한이 없으면 아무것도 삭제하지 않는다.
+     */
+    @Transactional
+    public BookmarkBulkResponse deleteAll(Long userId, List<Long> bookmarkIds) {
+        List<Bookmark> bookmarks = loadAccessible(userId, bookmarkIds);
+        List<Long> ids = bookmarks.stream().map(Bookmark::getId).toList();
+
+        bookmarkRepository.deleteAll(bookmarks);
+        vectorSyncService.enqueueDeletion(ids);
+
+        return BookmarkBulkResponse.of(ids);
+    }
+
+    /**
+     * 여러 북마크를 다른 스페이스로 옮긴다. 원래 스페이스와 대상 스페이스 모두의 멤버여야 하며,
+     * 하나라도 없거나 권한이 없으면 아무것도 옮기지 않는다. 이미 대상 스페이스에 있는 북마크는 건너뛴다.
+     */
+    @Transactional
+    public BookmarkBulkResponse move(Long userId, List<Long> bookmarkIds, Long targetSpaceId) {
+        spaceAccessService.validateMember(targetSpaceId, userId);
+        Space target = spaceRepository.getReferenceById(targetSpaceId);
+        List<Bookmark> bookmarks = loadAccessible(userId, bookmarkIds);
+
+        List<Bookmark> moving = bookmarks.stream()
+                .filter(bookmark -> !bookmark.getSpace().getId().equals(targetSpaceId))
+                .toList();
+        moving.forEach(bookmark -> bookmark.moveTo(target));
+
+        List<Long> movedIds = moving.stream().map(Bookmark::getId).toList();
+        vectorSyncService.enqueueSpaceUpdate(movedIds);
+
+        return BookmarkBulkResponse.of(movedIds);
     }
 
     @Transactional
@@ -95,7 +152,7 @@ public class BookmarkService {
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
         // 권한 검사를 통과한 경우에만 방문 기록을 남긴다.
-        validateSpaceMember(bookmark.getSpace().getId(), userId);
+        spaceAccessService.validateMember(bookmark.getSpace().getId(), userId);
 
         bookmark.recordVisit();
 
@@ -109,12 +166,29 @@ public class BookmarkService {
                 TimeFormatter.format(bookmark.getLastVisitedAt()),
                 bookmark.getCategory(),
                 bookmark.getAnalysisStatus(),
-                bookmark.getTags());
+                bookmark.getTags(),
+                bookmark.getSpace().getId(),
+                bookmark.getSpace().getName(),
+                BookmarkSaverDto.from(bookmark.getSavedBy()));
     }
 
-    private void validateSpaceMember(Long spaceId, Long userId) {
-        if (!spaceMemberRepository.existsBySpaceIdAndUserId(spaceId, userId)) {
-            throw new ForbiddenException("not a member of this space");
+    private List<Bookmark> loadAccessible(Long userId, Collection<Long> bookmarkIds) {
+        Set<Long> ids = new HashSet<>(bookmarkIds);
+        List<Bookmark> bookmarks = bookmarkRepository.findAllById(ids);
+        if (bookmarks.size() != ids.size()) {
+            throw new BookmarkNotFoundException("bookmark not found");
+        }
+
+        bookmarks.stream()
+                .map(bookmark -> bookmark.getSpace().getId())
+                .distinct()
+                .forEach(spaceId -> spaceAccessService.validateMember(spaceId, userId));
+        return bookmarks;
+    }
+
+    private void validatePage(int page, int size, int maxSize) {
+        if (page < 0 || size < 1 || size > maxSize) {
+            throw new InvalidRequestException("page must be >= 0 and size must be between 1 and " + maxSize);
         }
     }
 

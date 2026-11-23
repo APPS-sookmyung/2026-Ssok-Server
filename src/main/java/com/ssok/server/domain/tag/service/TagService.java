@@ -1,7 +1,6 @@
 package com.ssok.server.domain.tag.service;
 
 import com.ssok.server.common.exception.TagNotFoundException;
-import com.ssok.server.common.util.TimeFormatter;
 import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
@@ -61,17 +60,7 @@ public class TagService {
             throw new TagNotFoundException("tag not found");
         }
 
-        List<BookmarkSummaryDto> content = result.getContent().stream()
-                .map(bookmark -> new BookmarkSummaryDto(
-                        bookmark.getId(),
-                        bookmark.getTitle(),
-                        bookmark.getSummary(),
-                        bookmark.getVisitCount(),
-                        bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
-                        bookmark.getCategory(),
-                        bookmark.getAnalysisStatus(),
-                        bookmark.getTags()))
-                .toList();
+        List<BookmarkSummaryDto> content = result.getContent().stream().map(BookmarkSummaryDto::from).toList();
 
         return new TagBookmarkListResponse(
                 tagName, content, result.getNumber(), result.getSize(), result.getTotalElements(),

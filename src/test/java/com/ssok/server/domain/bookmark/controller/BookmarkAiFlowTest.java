@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssok.server.domain.ai.client.AiServerClient;
-import com.ssok.server.domain.ai.vector.VectorDeletionTaskRepository;
+import com.ssok.server.domain.ai.vector.VectorSyncOperation;
+import com.ssok.server.domain.ai.vector.VectorSyncTask;
+import com.ssok.server.domain.ai.vector.VectorSyncTaskRepository;
 import com.ssok.server.domain.bookmark.entity.AnalysisStatus;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.service.BookmarkAnalysisService;
@@ -70,7 +73,7 @@ class BookmarkAiFlowTest {
     private BookmarkAnalysisService bookmarkAnalysisService;
 
     @Autowired
-    private VectorDeletionTaskRepository vectorDeletionTaskRepository;
+    private VectorSyncTaskRepository vectorSyncTaskRepository;
 
     @MockitoBean
     private AiServerClient aiServerClient;
@@ -198,6 +201,29 @@ class BookmarkAiFlowTest {
     }
 
     @Test
+    void 분석_중에_이동한_북마크는_결과_반영_후_벡터_스페이스_갱신을_예약한다() throws Exception {
+        Long bookmarkId = saveBookmark();
+        String requestId = currentRequestId(bookmarkId);
+        Space other = spaceRepository.save(Space.builder().name("옮길 곳").type(SpaceType.TEAM)
+                .owner(userRepository.findById(ownerId).orElseThrow()).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(other)
+                .user(userRepository.findById(ownerId).orElseThrow()).role(SpaceRole.OWNER).build());
+
+        mockMvc.perform(patch("/api/bookmarks/move").with(loginAs(ownerId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarkIds\": [%d], \"targetSpaceId\": %d}".formatted(bookmarkId, other.getId())))
+                .andExpect(status().isOk());
+        vectorSyncTaskRepository.deleteAll(vectorSyncTaskRepository.findAllByBookmarkIdIn(List.of(bookmarkId)));
+
+        sendCallback(successBody(bookmarkId, requestId, "제목")).andExpect(status().isOk());
+
+        assertThat(vectorSyncTaskRepository.findAllByBookmarkIdIn(List.of(bookmarkId)))
+                .singleElement()
+                .extracting(VectorSyncTask::getOperation)
+                .isEqualTo(VectorSyncOperation.UPDATE_SPACE);
+    }
+
+    @Test
     void 콜백_시크릿이_틀리면_401을_반환한다() throws Exception {
         Long bookmarkId = saveBookmark();
 
@@ -224,7 +250,7 @@ class BookmarkAiFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("analysis result ignored: ignored_deleted"));
 
-        assertThat(vectorDeletionTaskRepository.findAllByBookmarkIdIn(List.of(999_999L))).hasSize(1);
+        assertThat(vectorSyncTaskRepository.findAllByBookmarkIdIn(List.of(999_999L))).hasSize(1);
     }
 
     @Test
@@ -304,7 +330,7 @@ class BookmarkAiFlowTest {
                 .andExpect(status().isOk());
 
         assertThat(bookmarkRepository.existsById(bookmarkId)).isFalse();
-        assertThat(vectorDeletionTaskRepository.findAllByBookmarkIdIn(List.of(bookmarkId))).hasSize(1);
+        assertThat(vectorSyncTaskRepository.findAllByBookmarkIdIn(List.of(bookmarkId))).hasSize(1);
     }
 
     private ResultActions sendCallback(String body) throws Exception {

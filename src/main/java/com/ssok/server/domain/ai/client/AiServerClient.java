@@ -4,6 +4,7 @@ import com.ssok.server.common.exception.AiServerException;
 import com.ssok.server.domain.ai.client.dto.AiAnalyzeRequest;
 import com.ssok.server.domain.ai.client.dto.AiSearchRequest;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
+import com.ssok.server.domain.ai.client.dto.AiVectorSpaceUpdateRequest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -67,6 +68,28 @@ public class AiServerClient {
             throw new AiServerException("ai vector deletion failed", e);
         } catch (RestClientException e) {
             throw new AiServerException("ai vector deletion failed", e);
+        }
+    }
+
+    /**
+     * 이동한 북마크 벡터의 space_id를 갱신한다.
+     * 아직 벡터가 없으면(404, 분석 진행 중) 분석 결과 반영 시 다시 맞추므로 성공으로 본다.
+     */
+    public void updateVectorSpace(Long bookmarkId, Long spaceId) {
+        try {
+            aiRestClient.patch()
+                    .uri("/api/v1/ai/bookmarks/{bookmarkId}", bookmarkId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new AiVectorSpaceUpdateRequest(spaceId))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return;
+            }
+            throw new AiServerException("ai vector space update failed", e);
+        } catch (RestClientException e) {
+            throw new AiServerException("ai vector space update failed", e);
         }
     }
 }

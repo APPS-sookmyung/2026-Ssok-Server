@@ -1,6 +1,6 @@
 package com.ssok.server.domain.bookmark.service;
 
-import com.ssok.server.domain.ai.vector.VectorDeletionService;
+import com.ssok.server.domain.ai.vector.VectorSyncService;
 import com.ssok.server.domain.bookmark.dto.AiAnalysisResultRequest;
 import com.ssok.server.domain.bookmark.entity.AnalysisStatus;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookmarkAnalysisService {
 
     private final BookmarkRepository bookmarkRepository;
-    private final VectorDeletionService vectorDeletionService;
+    private final VectorSyncService vectorSyncService;
 
     @Transactional
     public AnalysisResultOutcome applyResult(AiAnalysisResultRequest request) {
@@ -39,7 +39,7 @@ public class BookmarkAnalysisService {
         if (found.isEmpty()) {
             log.info("Ignoring AI result for deleted bookmark. bookmarkId={}", request.bookmarkId());
             // 삭제 이후 끝난 분석이 벡터를 다시 저장했을 수 있으므로 삭제를 한 번 더 예약한다.
-            vectorDeletionService.enqueue(List.of(request.bookmarkId()));
+            vectorSyncService.enqueueDeletion(List.of(request.bookmarkId()));
             return AnalysisResultOutcome.IGNORED_DELETED;
         }
 
@@ -58,6 +58,10 @@ public class BookmarkAnalysisService {
             AiAnalysisResultRequest.Analysis analysis = request.analysis();
             bookmark.updateTitle(analysis.title());
             bookmark.completeAnalysis(analysis.summary(), analysis.category(), analysis.tags());
+            if (bookmark.isMovedSinceAnalysisRequest()) {
+                // AI는 요청 당시 space_id로 벡터를 저장했으므로 현재 위치로 다시 맞춘다.
+                vectorSyncService.enqueueSpaceUpdate(List.of(bookmark.getId()));
+            }
             return AnalysisResultOutcome.APPLIED;
         }
 

@@ -34,6 +34,15 @@ public record BookmarkDetailResponse(
         AnalysisStatus analysisStatus,
 
         @Schema(description = "태그 목록")
-        List<String> tags
+        List<String> tags,
+
+        @Schema(description = "스페이스 ID", example = "1")
+        Long spaceId,
+
+        @Schema(description = "스페이스 이름", example = "프론트엔드 스터디")
+        String spaceName,
+
+        @Schema(description = "저장한 사용자 (알 수 없으면 null)", nullable = true)
+        BookmarkSaverDto savedBy
 ) {
 }
