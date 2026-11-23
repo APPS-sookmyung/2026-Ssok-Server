@@ -31,10 +31,11 @@ public class BookmarkService {
     private final SpaceRepository spaceRepository;
     private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.ssok.server.domain.library.repository.LibraryRepository libraryRepository;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
-        Space space = spaceRepository.findById(request.spaceId())
+        Space space = spaceRepository.findLockedById(request.spaceId())
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
         spaceAccessService.requireWrite(userId, space.getId());
 
@@ -43,6 +44,11 @@ public class BookmarkService {
                 .title(extractHost(request.url()))
                 .space(space)
                 .build();
+
+        if (request.libraryId() != null) {
+            bookmark.changeLibrary(libraryRepository.findByIdAndSpaceId(request.libraryId(), space.getId())
+                    .orElseThrow(() -> new com.ssok.server.common.exception.LibraryNotFoundException("library not found in this space")));
+        }
 
         Bookmark saved = bookmarkRepository.saveAndFlush(bookmark);
         eventPublisher.publishEvent(new BookmarkAnalysisRequestedEvent(saved.getId(), saved.getUrl()));
@@ -53,33 +59,45 @@ public class BookmarkService {
 
     @Transactional(readOnly = true)
     public BookmarkListResponse list(Long userId, Long spaceId, int page, int size) {
+        return list(userId, spaceId, page, size, null, false);
+    }
+
+    @Transactional(readOnly = true)
+    public BookmarkListResponse list(Long userId, Long spaceId, int page, int size, Long libraryId, boolean unclassified) {
         if (!spaceRepository.existsById(spaceId)) {
             throw new SpaceNotFoundException("space not found");
         }
         spaceAccessService.requireMember(userId, spaceId, "not a member of this space");
 
-        Page<Bookmark> result = bookmarkRepository.findAllBySpaceId(spaceId, PageRequest.of(page, size));
+        if (libraryId != null && unclassified) {
+            throw new com.ssok.server.common.exception.InvalidRequestException("libraryId and unclassified cannot be combined");
+        }
+        var pageable = com.ssok.server.domain.library.service.LibraryService.pageable(page, size, "recent");
+        Page<Bookmark> result;
+        if (libraryId != null) {
+            libraryRepository.findByIdAndSpaceId(libraryId, spaceId)
+                    .orElseThrow(() -> new com.ssok.server.common.exception.LibraryNotFoundException("library not found in this space"));
+            result = bookmarkRepository.findAllBySpaceIdAndLibraryId(spaceId, libraryId, pageable);
+        } else if (unclassified) {
+            result = bookmarkRepository.findAllBySpaceIdAndLibraryIsNull(spaceId, pageable);
+        } else {
+            result = bookmarkRepository.findAllBySpaceId(spaceId, pageable);
+        }
 
         List<BookmarkSummaryDto> content = result.getContent().stream()
-                .map(bookmark -> new BookmarkSummaryDto(
-                        bookmark.getId(),
-                        bookmark.getTitle(),
-                        bookmark.getSummary(),
-                        bookmark.getVisitCount(),
-                        bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
-                        bookmark.getCategory(),
-                        bookmark.getAnalysisStatus(),
-                        bookmark.getTags()))
+                .map(BookmarkSummaryDto::from)
                 .toList();
 
         return new BookmarkListResponse(
                 content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void delete(Long userId, Long bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
+        spaceRepository.findLockedById(bookmark.getSpace().getId())
+                .orElseThrow(() -> new SpaceNotFoundException("space not found"));
         spaceAccessService.requireWrite(userId, bookmark.getSpace().getId());
 
         bookmarkRepository.delete(bookmark);
@@ -105,7 +123,8 @@ public class BookmarkService {
                 TimeFormatter.format(bookmark.getLastVisitedAt()),
                 bookmark.getCategory(),
                 bookmark.getAnalysisStatus(),
-                bookmark.getTags());
+                bookmark.getTags(),
+                bookmark.getLibrary() == null ? null : bookmark.getLibrary().getId());
     }
 
     // AI 분석 결과에는 제목이 없으므로 URL의 호스트를 제목으로 사용한다.

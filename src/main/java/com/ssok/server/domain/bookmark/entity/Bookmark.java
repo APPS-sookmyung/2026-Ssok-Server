@@ -24,6 +24,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "bookmarks")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -67,6 +68,18 @@ public class Bookmark {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "library_id", foreignKey = @jakarta.persistence.ForeignKey(name = "fk_bookmark_library"))
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    private com.ssok.server.domain.library.entity.Library library;
+
+    public void changeLibrary(com.ssok.server.domain.library.entity.Library library) {
+        if (library != null && !library.getSpace().getId().equals(space.getId())) {
+            throw new IllegalArgumentException("library must belong to the bookmark space");
+        }
+        this.library = library;
+    }
 
     @Builder
     public Bookmark(String url, String title, Space space) {

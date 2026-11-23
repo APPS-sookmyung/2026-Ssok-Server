@@ -12,6 +12,12 @@ public record BookmarkSaveRequest(
         @URL(message = "invalid url") String url,
 
         @Schema(description = "저장할 스페이스 ID", example = "1")
-        @NotNull Long spaceId
+        @NotNull Long spaceId,
+
+        @Schema(description = "선택할 라이브러리 ID. 생략 시 미분류")
+        @jakarta.validation.constraints.Positive Long libraryId
 ) {
+    public BookmarkSaveRequest(String url, Long spaceId) {
+        this(url, spaceId, null);
+    }
 }

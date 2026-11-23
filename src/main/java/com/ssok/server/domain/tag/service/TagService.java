@@ -52,15 +52,7 @@ public class TagService {
         }
 
         List<BookmarkSummaryDto> content = result.getContent().stream()
-                .map(bookmark -> new BookmarkSummaryDto(
-                        bookmark.getId(),
-                        bookmark.getTitle(),
-                        bookmark.getSummary(),
-                        bookmark.getVisitCount(),
-                        bookmark.getLastVisitedAt() != null ? TimeFormatter.format(bookmark.getLastVisitedAt()) : null,
-                        bookmark.getCategory(),
-                        bookmark.getAnalysisStatus(),
-                        bookmark.getTags()))
+                .map(BookmarkSummaryDto::from)
                 .toList();
 
         return new TagBookmarkListResponse(

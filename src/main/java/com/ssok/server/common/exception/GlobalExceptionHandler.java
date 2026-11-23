@@ -13,6 +13,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(LibraryNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLibraryNotFound(LibraryNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateLibraryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateLibrary(DuplicateLibraryException e) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, e.getMessage()));
+    }
+
     @ExceptionHandler(InvitationConflictException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvitationConflict(InvitationConflictException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(409, e.getMessage()));

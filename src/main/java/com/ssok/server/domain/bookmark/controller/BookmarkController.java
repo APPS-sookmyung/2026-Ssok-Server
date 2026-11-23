@@ -47,8 +47,10 @@ public class BookmarkController {
             @RequestParam Long spaceId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long libraryId,
+            @RequestParam(defaultValue = "false") boolean unclassified,
             Authentication authentication) {
-        BookmarkListResponse response = bookmarkService.list(requireUserId(authentication), spaceId, page, size);
+        BookmarkListResponse response = bookmarkService.list(requireUserId(authentication), spaceId, page, size, libraryId, unclassified);
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "bookmark list retrieved successfully", response));
