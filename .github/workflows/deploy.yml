@@ -1,0 +1,77 @@
+name: Deploy
+
+# main에 반영되면 이미지를 GHCR에 올리고, 서버 접속 정보가 설정돼 있으면 서버에 배포한다.
+# 필요한 저장소 Secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, (선택) DEPLOY_PORT, DEPLOY_PATH
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/2026-ssok-server
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: |
+          echo "tag=$(echo '${{ env.IMAGE }}' | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "latest=$(echo '${{ env.IMAGE }}' | tr '[:upper:]' '[:lower:]'):latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.latest }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  server:
+    runs-on: ubuntu-latest
+    needs: image
+    timeout-minutes: 15
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+    steps:
+      - name: Skip when server is not configured
+        if: env.DEPLOY_HOST == ''
+        run: echo "DEPLOY_HOST secret is not set. Image was pushed; skipping server deploy."
+
+      - name: Deploy over SSH
+        if: env.DEPLOY_HOST != ''
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          script: |
+            cd ${{ secrets.DEPLOY_PATH || '~/ssok' }}
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            SERVER_IMAGE=${{ needs.image.outputs.tag }} ./deploy/deploy.sh
