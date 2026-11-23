@@ -119,6 +119,19 @@ public class Bookmark {
         return analysisSpaceId != null && !analysisSpaceId.equals(space.getId());
     }
 
+    /**
+     * 다른 스페이스로 공유할 복사본. 원본의 분석 결과를 미리 보여주되,
+     * 대상 스페이스용 벡터가 따로 필요하므로 새 분석 요청 상태(PENDING)로 만든다.
+     */
+    public Bookmark copyTo(Space target, User sharer) {
+        Bookmark copy = new Bookmark(url, title, target, sharer);
+        if (summary != null || category != null || !tags.isEmpty()) {
+            copy.completeAnalysis(summary, category, tags);
+            copy.requestAnalysis();
+        }
+        return copy;
+    }
+
     public void moveTo(Space target) {
         this.space = target;
     }

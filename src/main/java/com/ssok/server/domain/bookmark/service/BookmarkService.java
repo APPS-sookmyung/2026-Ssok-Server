@@ -13,6 +13,7 @@ import com.ssok.server.domain.bookmark.dto.BookmarkLookupDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaverDto;
+import com.ssok.server.domain.bookmark.dto.BookmarkShareResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSort;
 import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
@@ -26,7 +27,9 @@ import com.ssok.server.domain.space.service.SpaceAccessService;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -170,6 +173,39 @@ public class BookmarkService {
         vectorSyncService.enqueueSpaceUpdate(movedIds);
 
         return BookmarkBulkResponse.of(movedIds);
+    }
+
+    /**
+     * 북마크를 다른 스페이스로 공유(복사)한다. 원본은 그대로 남는다.
+     * 원본·대상 스페이스 모두의 멤버여야 하고, 하나라도 없거나 권한이 없으면 아무것도 공유하지 않는다.
+     * 대상 스페이스에 같은 URL이 이미 있거나 요청 안에서 URL이 겹치면 건너뛴다.
+     */
+    @Transactional
+    public BookmarkShareResponse share(Long userId, List<Long> bookmarkIds, Long targetSpaceId) {
+        spaceAccessService.validateMember(targetSpaceId, userId);
+        Space target = spaceRepository.getReferenceById(targetSpaceId);
+        User sharer = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthenticatedException("authentication required"));
+
+        List<Bookmark> sources = loadAccessible(userId, bookmarkIds).stream()
+                .sorted(Comparator.comparing(Bookmark::getId))
+                .toList();
+        Set<String> taken = new HashSet<>(bookmarkRepository.findExistingUrls(
+                targetSpaceId, sources.stream().map(Bookmark::getUrl).toList()));
+
+        List<BookmarkShareResponse.Shared> shared = new ArrayList<>();
+        List<Long> skipped = new ArrayList<>();
+        for (Bookmark source : sources) {
+            if (!taken.add(source.getUrl())) {
+                skipped.add(source.getId());
+                continue;
+            }
+            Bookmark copy = bookmarkRepository.saveAndFlush(source.copyTo(target, sharer));
+            eventPublisher.publishEvent(BookmarkAnalysisRequestedEvent.from(copy));
+            shared.add(new BookmarkShareResponse.Shared(source.getId(), copy.getId()));
+        }
+
+        return new BookmarkShareResponse(shared, skipped);
     }
 
     @Transactional

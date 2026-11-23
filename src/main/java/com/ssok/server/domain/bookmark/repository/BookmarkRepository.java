@@ -30,6 +30,9 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     @EntityGraph(attributePaths = "space")
     List<Bookmark> findWithSpaceByIdIn(Collection<Long> ids);
 
+    @Query("select b.url from Bookmark b where b.space.id = :spaceId and b.url in :urls")
+    List<String> findExistingUrls(@Param("spaceId") Long spaceId, @Param("urls") Collection<String> urls);
+
     @EntityGraph(attributePaths = "space")
     List<Bookmark> findByUrlInAndSpaceIdInOrderByIdDesc(Collection<String> urls, Collection<Long> spaceIds);
 
