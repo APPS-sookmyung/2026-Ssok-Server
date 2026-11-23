@@ -24,6 +24,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Table(name = "bookmarks")
@@ -86,6 +88,7 @@ public class Bookmark {
     // 저장한 사용자. 기존 데이터와 탈퇴한 사용자를 위해 null을 허용한다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "saved_by_user_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     private User savedBy;
 
     @Builder

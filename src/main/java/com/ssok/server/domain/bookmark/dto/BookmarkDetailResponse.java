@@ -43,6 +43,9 @@ public record BookmarkDetailResponse(
         String spaceName,
 
         @Schema(description = "저장한 사용자 (알 수 없으면 null)", nullable = true)
-        BookmarkSaverDto savedBy
+        BookmarkSaverDto savedBy,
+
+        @Schema(description = "댓글 수", example = "3")
+        long commentCount
 ) {
 }

@@ -3,8 +3,12 @@ package com.ssok.server.domain.bookmark.dto;
 import com.ssok.server.common.util.TimeFormatter;
 import com.ssok.server.domain.bookmark.entity.AnalysisStatus;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
+import com.ssok.server.domain.comment.dto.CommentPreviewDto;
+import com.ssok.server.domain.comment.dto.CommentStats;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 public record BookmarkSummaryDto(
 
@@ -45,10 +49,23 @@ public record BookmarkSummaryDto(
         BookmarkSaverDto savedBy,
 
         @Schema(description = "저장 시각", example = "2026-06-29T21:10:33")
-        String createdAt
+        String createdAt,
+
+        @Schema(description = "댓글 수", example = "3")
+        long commentCount,
+
+        @Schema(description = "가장 최근 댓글 미리보기 (댓글이 없으면 null)", nullable = true)
+        CommentPreviewDto latestComment
 ) {
 
-    public static BookmarkSummaryDto from(Bookmark bookmark) {
+    /**
+     * 댓글 정보는 여러 북마크를 한꺼번에 조회해 넘겨받는다(statsByBookmarkId).
+     */
+    public static Function<Bookmark, BookmarkSummaryDto> withComments(Map<Long, CommentStats> statsByBookmarkId) {
+        return bookmark -> from(bookmark, statsByBookmarkId.getOrDefault(bookmark.getId(), CommentStats.EMPTY));
+    }
+
+    public static BookmarkSummaryDto from(Bookmark bookmark, CommentStats comments) {
         return new BookmarkSummaryDto(
                 bookmark.getId(),
                 bookmark.getTitle(),
@@ -62,6 +79,8 @@ public record BookmarkSummaryDto(
                 bookmark.getSpace().getId(),
                 bookmark.getSpace().getName(),
                 BookmarkSaverDto.from(bookmark.getSavedBy()),
-                TimeFormatter.format(bookmark.getCreatedAt()));
+                TimeFormatter.format(bookmark.getCreatedAt()),
+                comments.count(),
+                comments.latest());
     }
 }

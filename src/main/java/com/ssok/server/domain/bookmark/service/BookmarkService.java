@@ -17,6 +17,8 @@ import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.event.BookmarkAnalysisRequestedEvent;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
+import com.ssok.server.domain.comment.repository.CommentRepository;
+import com.ssok.server.domain.comment.service.CommentService;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.space.service.SpaceAccessService;
@@ -47,6 +49,8 @@ public class BookmarkService {
     private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
     private final VectorSyncService vectorSyncService;
+    private final CommentService commentService;
+    private final CommentRepository commentRepository;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
@@ -80,7 +84,7 @@ public class BookmarkService {
                 spaceId, PageRequest.of(page, size, bookmarkSort.toSort()));
 
         return new BookmarkListResponse(
-                result.getContent().stream().map(BookmarkSummaryDto::from).toList(),
+                toSummaries(result.getContent()),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
@@ -95,10 +99,8 @@ public class BookmarkService {
             return List.of();
         }
 
-        return bookmarkRepository.findBySpaceIdIn(spaceIds, PageRequest.of(0, size, BookmarkSort.LATEST.toSort()))
-                .stream()
-                .map(BookmarkSummaryDto::from)
-                .toList();
+        return toSummaries(bookmarkRepository.findBySpaceIdIn(
+                spaceIds, PageRequest.of(0, size, BookmarkSort.LATEST.toSort())).getContent());
     }
 
     @Transactional
@@ -169,7 +171,13 @@ public class BookmarkService {
                 bookmark.getTags(),
                 bookmark.getSpace().getId(),
                 bookmark.getSpace().getName(),
-                BookmarkSaverDto.from(bookmark.getSavedBy()));
+                BookmarkSaverDto.from(bookmark.getSavedBy()),
+                commentRepository.countByBookmarkId(bookmark.getId()));
+    }
+
+    private List<BookmarkSummaryDto> toSummaries(List<Bookmark> bookmarks) {
+        var stats = commentService.statsFor(bookmarks.stream().map(Bookmark::getId).toList());
+        return bookmarks.stream().map(BookmarkSummaryDto.withComments(stats)).toList();
     }
 
     private List<Bookmark> loadAccessible(Long userId, Collection<Long> bookmarkIds) {

@@ -4,6 +4,7 @@ import com.ssok.server.common.exception.TagNotFoundException;
 import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
+import com.ssok.server.domain.comment.service.CommentService;
 import com.ssok.server.domain.space.service.SpaceAccessService;
 import com.ssok.server.domain.tag.dto.TagBookmarkListResponse;
 import com.ssok.server.domain.tag.dto.TagDto;
@@ -24,6 +25,7 @@ public class TagService {
 
     private final BookmarkRepository bookmarkRepository;
     private final SpaceAccessService spaceAccessService;
+    private final CommentService commentService;
 
     /**
      * 사용자가 속한 스페이스의 북마크에 붙은 태그만 집계한다.
@@ -60,7 +62,9 @@ public class TagService {
             throw new TagNotFoundException("tag not found");
         }
 
-        List<BookmarkSummaryDto> content = result.getContent().stream().map(BookmarkSummaryDto::from).toList();
+        var stats = commentService.statsFor(result.getContent().stream().map(Bookmark::getId).toList());
+        List<BookmarkSummaryDto> content =
+                result.getContent().stream().map(BookmarkSummaryDto.withComments(stats)).toList();
 
         return new TagBookmarkListResponse(
                 tagName, content, result.getNumber(), result.getSize(), result.getTotalElements(),

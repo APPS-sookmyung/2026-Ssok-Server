@@ -69,6 +69,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), e.getMessage()));
     }
 
+    @ExceptionHandler(CommentNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCommentNotFound(CommentNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(TagNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleTagNotFound(TagNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
