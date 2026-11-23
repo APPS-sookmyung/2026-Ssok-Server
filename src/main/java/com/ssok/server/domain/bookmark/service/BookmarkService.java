@@ -9,6 +9,7 @@ import com.ssok.server.domain.ai.vector.VectorSyncService;
 import com.ssok.server.domain.bookmark.dto.BookmarkBulkResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
+import com.ssok.server.domain.bookmark.dto.BookmarkLookupDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaverDto;
@@ -62,7 +63,9 @@ public class BookmarkService {
 
         Bookmark bookmark = Bookmark.builder()
                 .url(request.url())
-                .title(extractHost(request.url()))
+                .title(request.title() != null && !request.title().isBlank()
+                        ? request.title().strip()
+                        : extractHost(request.url()))
                 .space(space)
                 .savedBy(saver)
                 .build();
@@ -101,6 +104,27 @@ public class BookmarkService {
 
         return toSummaries(bookmarkRepository.findBySpaceIdIn(
                 spaceIds, PageRequest.of(0, size, BookmarkSort.LATEST.toSort())).getContent());
+    }
+
+    /**
+     * 내가 속한 스페이스에 같은 URL이 저장돼 있는지 찾는다. 끝의 '/' 유무는 같은 주소로 본다.
+     */
+    @Transactional(readOnly = true)
+    public List<BookmarkLookupDto> lookup(Long userId, String url) {
+        if (url == null || url.isBlank()) {
+            throw new InvalidRequestException("invalid url");
+        }
+        Set<Long> spaceIds = spaceAccessService.getAccessibleSpaceIds(userId);
+        if (spaceIds.isEmpty()) {
+            return List.of();
+        }
+
+        String trimmed = url.strip();
+        String withoutSlash = trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+        return bookmarkRepository.findByUrlInAndSpaceIdInOrderByIdDesc(Set.of(withoutSlash, withoutSlash + "/"), spaceIds)
+                .stream()
+                .map(BookmarkLookupDto::from)
+                .toList();
     }
 
     @Transactional

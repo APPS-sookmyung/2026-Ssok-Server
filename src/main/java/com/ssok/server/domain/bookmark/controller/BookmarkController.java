@@ -6,6 +6,7 @@ import com.ssok.server.domain.bookmark.dto.BookmarkBulkDeleteRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkBulkResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
+import com.ssok.server.domain.bookmark.dto.BookmarkLookupDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkMoveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveResponse;
@@ -39,7 +40,9 @@ public class BookmarkController {
 
     private final BookmarkService bookmarkService;
 
-    @Operation(summary = "사이트 저장", description = "북마크를 저장하고 AI 분석을 요청 (분석 결과는 비동기로 반영)")
+    @Operation(summary = "사이트 저장",
+            description = "북마크를 저장하고 AI 분석을 요청 (분석 결과는 비동기로 반영). "
+                    + "브라우저 확장 프로그램은 현재 탭 제목을 title로 함께 보낼 수 있음")
     @PostMapping
     public ResponseEntity<ApiResponse<BookmarkSaveResponse>> save(
             @RequestBody @Valid BookmarkSaveRequest request, Authentication authentication) {
@@ -74,6 +77,16 @@ public class BookmarkController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "recent bookmarks retrieved successfully", response));
+    }
+
+    @Operation(summary = "저장 여부 확인",
+            description = "내가 속한 스페이스에 이 URL이 이미 저장돼 있는지 조회 (브라우저 확장 프로그램용). 없으면 빈 목록")
+    @GetMapping("/lookup")
+    public ResponseEntity<ApiResponse<List<BookmarkLookupDto>>> lookup(
+            @RequestParam String url, Authentication authentication) {
+        List<BookmarkLookupDto> response = bookmarkService.lookup(requireUserId(authentication), url);
+
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "lookup completed", response));
     }
 
     @Operation(summary = "저장 사이트 여러 개 삭제",
