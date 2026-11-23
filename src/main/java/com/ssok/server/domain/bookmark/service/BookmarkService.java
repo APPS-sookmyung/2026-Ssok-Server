@@ -4,6 +4,7 @@ import com.ssok.server.common.exception.BookmarkNotFoundException;
 import com.ssok.server.common.exception.ForbiddenException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.util.TimeFormatter;
+import com.ssok.server.domain.ai.vector.VectorDeletionService;
 import com.ssok.server.domain.bookmark.dto.BookmarkDetailResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkListResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
@@ -32,6 +33,7 @@ public class BookmarkService {
     private final SpaceRepository spaceRepository;
     private final SpaceMemberRepository spaceMemberRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final VectorDeletionService vectorDeletionService;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
@@ -46,7 +48,7 @@ public class BookmarkService {
                 .build();
 
         Bookmark saved = bookmarkRepository.saveAndFlush(bookmark);
-        eventPublisher.publishEvent(new BookmarkAnalysisRequestedEvent(saved.getId(), saved.getUrl()));
+        eventPublisher.publishEvent(BookmarkAnalysisRequestedEvent.from(saved));
 
         return new BookmarkSaveResponse(
                 saved.getId(), saved.getTitle(), saved.getAnalysisStatus(), TimeFormatter.format(saved.getCreatedAt()));
@@ -84,6 +86,7 @@ public class BookmarkService {
         validateSpaceMember(bookmark.getSpace().getId(), userId);
 
         bookmarkRepository.delete(bookmark);
+        vectorDeletionService.enqueue(List.of(bookmarkId));
     }
 
     @Transactional
@@ -115,7 +118,7 @@ public class BookmarkService {
         }
     }
 
-    // AI 분석 결과에는 제목이 없으므로 URL의 호스트를 제목으로 사용한다.
+    // AI 분석 결과로 제목이 오기 전까지는 URL의 호스트를 제목으로 사용한다.
     private String extractHost(String url) {
         try {
             String host = URI.create(url).getHost();

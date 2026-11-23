@@ -5,6 +5,7 @@ import com.ssok.server.common.exception.InvalidRequestException;
 import com.ssok.server.common.exception.SpaceNotFoundException;
 import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.util.TimeFormatter;
+import com.ssok.server.domain.ai.vector.VectorDeletionService;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.dto.SpaceCreateRequest;
 import com.ssok.server.domain.space.dto.SpaceCreateResponse;
@@ -31,6 +32,7 @@ public class SpaceService {
     private final SpaceMemberRepository spaceMemberRepository;
     private final BookmarkRepository bookmarkRepository;
     private final UserRepository userRepository;
+    private final VectorDeletionService vectorDeletionService;
 
     @Transactional
     public SpaceCreateResponse create(Long userId, SpaceCreateRequest request) {
@@ -110,7 +112,9 @@ public class SpaceService {
         // 엔티티 삭제로 members/bookmarks에 REMOVE를 전파하고,
         // Bookmark의 ElementCollection인 bookmark_tags도 같은 트랜잭션에서 삭제한다.
         // 벌크 DELETE는 JPA 연쇄 삭제를 생략하므로 사용하지 않는다.
+        List<Long> bookmarkIds = bookmarkRepository.findIdsBySpaceId(spaceId);
         spaceRepository.delete(space);
+        vectorDeletionService.enqueue(bookmarkIds);
     }
 
     private SpaceType parseType(String type) {
