@@ -9,7 +9,10 @@ import com.ssok.server.common.security.JwtTokenProvider;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
+import com.ssok.server.domain.space.entity.SpaceMember;
+import com.ssok.server.domain.space.entity.SpaceRole;
 import com.ssok.server.domain.space.entity.SpaceType;
+import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
@@ -44,9 +47,13 @@ class TagControllerTest {
     private SpaceRepository spaceRepository;
 
     @Autowired
+    private SpaceMemberRepository spaceMemberRepository;
+
+    @Autowired
     private BookmarkRepository bookmarkRepository;
 
     private Space space;
+    private Space otherSpace;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +62,13 @@ class TagControllerTest {
 
         space = spaceRepository.save(
                 Space.builder().name("태그 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(space).user(owner).role(SpaceRole.OWNER).build());
+
+        User other = userRepository.save(
+                User.builder().email("tag-other@ssok.com").password("encoded").name("other").build());
+        otherSpace = spaceRepository.save(
+                Space.builder().name("다른 사람 스페이스").type(SpaceType.PERSONAL).owner(other).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(otherSpace).user(other).role(SpaceRole.OWNER).build());
 
         String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -121,13 +135,43 @@ class TagControllerTest {
                 .andExpect(jsonPath("$.data.content.length()").value(0));
     }
 
-    // 태그는 AI 분석 콜백으로 채워지므로, 분석이 끝난 북마크를 직접 저장한다.
+    @Test
+    void 내가_속하지_않은_스페이스의_태그는_목록에_집계되지_않는다() throws Exception {
+        saveBookmark("https://spring.io");
+        saveBookmark("https://github.com", otherSpace);
+
+        mockMvc.perform(get("/api/tags"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.tagName=='Github')]").isEmpty())
+                .andExpect(jsonPath("$.data[?(@.tagName=='Bookmark')].bookmarkCount").value(1));
+    }
+
+    @Test
+    void 내가_속하지_않은_스페이스에만_있는_태그를_조회하면_404를_반환한다() throws Exception {
+        saveBookmark("https://github.com", otherSpace);
+
+        mockMvc.perform(get("/api/tags/{tagName}/bookmarks", "Github"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 로그인하지_않으면_태그_목록_조회시_401을_반환한다() throws Exception {
+        MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build()
+                .perform(get("/api/tags"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private void saveBookmark(String url) {
+        saveBookmark(url, space);
+    }
+
+    // 태그는 AI 분석 콜백으로 채워지므로, 분석이 끝난 북마크를 직접 저장한다.
+    private void saveBookmark(String url, Space target) {
         String host = URI.create(url).getHost();
         String label = host.substring(0, host.indexOf('.'));
         String tag = Character.toUpperCase(label.charAt(0)) + label.substring(1);
 
-        Bookmark bookmark = Bookmark.builder().url(url).title(host).space(space).build();
+        Bookmark bookmark = Bookmark.builder().url(url).title(host).space(target).build();
         bookmark.completeAnalysis(host + " 요약", "개발/기술", List.of(tag, "Bookmark"));
         bookmarkRepository.save(bookmark);
     }

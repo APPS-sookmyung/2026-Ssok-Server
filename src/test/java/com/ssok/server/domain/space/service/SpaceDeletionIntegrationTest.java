@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ssok.server.common.exception.ForbiddenException;
+import com.ssok.server.domain.ai.vector.VectorSyncService;
 import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceMember;
@@ -19,7 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @DataJpaTest
-@Import(SpaceService.class)
+@Import({SpaceService.class, VectorSyncService.class})
 class SpaceDeletionIntegrationTest {
 
     @Autowired private TestEntityManager entities;
@@ -54,7 +55,10 @@ class SpaceDeletionIntegrationTest {
             assertThat(count("bookmarks", "space_id", targetId)).isZero();
             for (Long bookmarkId : removedIds) {
                 assertThat(count("bookmark_tags", "bookmark_id", bookmarkId)).isZero();
+                // AI 서버 벡터 삭제가 같은 트랜잭션에서 예약된다.
+                assertThat(count("vector_sync_tasks", "bookmark_id", bookmarkId)).isEqualTo(1);
             }
+            assertThat(count("vector_sync_tasks", "bookmark_id", retainedId)).isZero();
             assertThat(count("spaces", "id", preservedId)).isEqualTo(1);
             assertThat(count("space_members", "space_id", preservedId)).isEqualTo(1);
             assertThat(count("bookmarks", "id", retainedId)).isEqualTo(1);

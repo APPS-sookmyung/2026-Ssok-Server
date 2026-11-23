@@ -1,5 +1,6 @@
 package com.ssok.server.domain.tag.controller;
 
+import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.response.ApiResponse;
 import com.ssok.server.domain.tag.dto.TagBookmarkListResponse;
 import com.ssok.server.domain.tag.dto.TagDto;
@@ -10,6 +11,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,23 +26,33 @@ public class TagController {
 
     private final TagService tagService;
 
-    @Operation(summary = "태그 목록", description = "AI가 생성한 태그 목록 조회")
+    @Operation(summary = "태그 목록", description = "내가 속한 스페이스의 북마크에 AI가 생성한 태그 목록 조회")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<TagDto>>> list() {
-        List<TagDto> response = tagService.list();
+    public ResponseEntity<ApiResponse<List<TagDto>>> list(Authentication authentication) {
+        List<TagDto> response = tagService.list(requireUserId(authentication));
 
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "tag list retrieved successfully", response));
     }
 
-    @Operation(summary = "특정 태그의 사이트 조회", description = "선택한 태그가 포함된 저장 사이트 목록 조회")
+    @Operation(summary = "특정 태그의 사이트 조회", description = "내가 속한 스페이스에서 선택한 태그가 포함된 저장 사이트 목록 조회")
     @GetMapping("/{tagName}/bookmarks")
     public ResponseEntity<ApiResponse<TagBookmarkListResponse>> getBookmarksByTag(
             @PathVariable String tagName,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        TagBookmarkListResponse response = tagService.getBookmarksByTag(tagName, page, size);
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        TagBookmarkListResponse response =
+                tagService.getBookmarksByTag(requireUserId(authentication), tagName, page, size);
 
         return ResponseEntity.ok(
                 ApiResponse.success(HttpStatus.OK.value(), "bookmarks retrieved successfully", response));
+    }
+
+    private Long requireUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException("authentication required");
+        }
+
+        return (Long) authentication.getPrincipal();
     }
 }
