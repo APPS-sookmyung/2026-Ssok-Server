@@ -30,6 +30,8 @@ public class SecurityConfig {
             "/api/auth/**",
             // AI 서버 콜백: JWT 대신 X-AI-Callback-Secret 헤더로 검증
             "/api/v1/bookmarks/ai-result",
+            // 배포·로드밸런서 상태 확인
+            "/actuator/health",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
