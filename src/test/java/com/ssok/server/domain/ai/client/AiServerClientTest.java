@@ -15,6 +15,7 @@ import com.ssok.server.common.exception.AiServerException;
 import com.ssok.server.domain.ai.client.dto.AiAnalyzeRequest;
 import com.ssok.server.domain.ai.client.dto.AiChatRequest;
 import com.ssok.server.domain.ai.client.dto.AiChatResponse;
+import com.ssok.server.domain.ai.client.dto.AiSearchRequest;
 import com.ssok.server.domain.ai.client.dto.AiSearchResponse;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,17 +77,32 @@ class AiServerClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         List<AiSearchResponse.Result> results =
-                aiServerClient.search("그 리액트 버전 비교하는 글 뭐였지", 5, List.of(1L, 3L));
+                aiServerClient.search(new AiSearchRequest("그 리액트 버전 비교하는 글 뭐였지", 5, List.of(1L, 3L)));
 
         assertThat(results).extracting(AiSearchResponse.Result::bookmarkId).containsExactly(123L, 74L);
         assertThat(results.get(0).similarity()).isEqualTo(0.895);
     }
 
     @Test
+    void 날짜_조건이_있으면_saved_from과_saved_to를_함께_보낸다() {
+        server.expect(requestTo("http://ai-server/api/v1/ai/search"))
+                .andExpect(content().json("""
+                        {"query": "q", "top_k": 10, "space_ids": [1],
+                         "saved_from": "2026-11-01T00:00:00.000+09:00", "saved_to": "2026-11-24T00:00:00.000+09:00"}
+                        """, true))
+                .andRespond(withSuccess("{\"query\": \"q\", \"results\": []}", MediaType.APPLICATION_JSON));
+
+        aiServerClient.search(new AiSearchRequest("q", 10, List.of(1L),
+                "2026-11-01T00:00:00.000+09:00", "2026-11-24T00:00:00.000+09:00"));
+
+        server.verify();
+    }
+
+    @Test
     void AI_서버가_오류를_반환하면_AiServerException을_던진다() {
         server.expect(requestTo("http://ai-server/api/v1/ai/search")).andRespond(withServerError());
 
-        assertThatThrownBy(() -> aiServerClient.search("query", 5, List.of(1L)))
+        assertThatThrownBy(() -> aiServerClient.search(new AiSearchRequest("query", 5, List.of(1L))))
                 .isInstanceOf(AiServerException.class);
     }
 

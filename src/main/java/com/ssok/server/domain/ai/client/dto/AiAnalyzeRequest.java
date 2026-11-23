@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 /**
  * AI 서버 분석 요청 본문.
@@ -22,9 +21,6 @@ public record AiAnalyzeRequest(
         String analysisRequestId
 ) {
 
-    // xxx는 UTC에서도 "Z" 대신 "+00:00"을 출력한다.
-    private static final DateTimeFormatter SAVED_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-
     /**
      * @param savedAt 서버 기본 시간대 기준 LocalDateTime(@CreationTimestamp 값)
      */
@@ -35,6 +31,6 @@ public record AiAnalyzeRequest(
     }
 
     static String formatSavedAt(LocalDateTime savedAt, ZoneId zone) {
-        return savedAt.atZone(zone).toOffsetDateTime().format(SAVED_AT_FORMAT);
+        return AiTimeFormat.format(savedAt, zone);
     }
 }

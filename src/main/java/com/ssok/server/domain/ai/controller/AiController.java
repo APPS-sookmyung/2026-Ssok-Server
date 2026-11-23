@@ -3,6 +3,7 @@ package com.ssok.server.domain.ai.controller;
 import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.response.ApiResponse;
 import com.ssok.server.domain.ai.dto.SemanticSearchRequest;
+import com.ssok.server.domain.ai.dto.SemanticSearchResponse;
 import com.ssok.server.domain.ai.dto.SimilarBookmarkResponse;
 import com.ssok.server.domain.ai.dto.SummaryRequest;
 import com.ssok.server.domain.ai.dto.SummaryResponse;
@@ -42,12 +43,12 @@ public class AiController {
 
     @Operation(summary = "의미 기반 검색",
             description = "사용자가 입력한 자연어와 의미적으로 가장 유사한 저장 사이트 검색. "
-                    + "spaceId를 생략하면 내가 속한 모든 스페이스, 지정하면 그 스페이스에서만 검색 (권한 없으면 403)")
+                    + "spaceId를 생략하면 내가 속한 모든 스페이스, 지정하면 그 스페이스에서만 검색 (권한 없으면 403). "
+                    + "savedFrom·savedTo로 저장 날짜를 제한할 수 있고(양 끝 포함), count가 '검색결과 N건'의 N")
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse<List<SimilarBookmarkResponse>>> search(
+    public ResponseEntity<ApiResponse<SemanticSearchResponse>> search(
             @RequestBody @Valid SemanticSearchRequest request, Authentication authentication) {
-        List<SimilarBookmarkResponse> response =
-                aiService.search(requireUserId(authentication), request.query(), request.spaceId());
+        SemanticSearchResponse response = aiService.search(requireUserId(authentication), request);
 
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "semantic search completed", response));
     }

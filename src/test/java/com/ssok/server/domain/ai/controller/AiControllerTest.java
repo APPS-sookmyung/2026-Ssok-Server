@@ -1,9 +1,7 @@
 package com.ssok.server.domain.ai.controller;
 
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -71,6 +69,12 @@ class AiControllerTest {
     @Autowired
     private BookmarkRepository bookmarkRepository;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
     @MockitoBean
     private AiServerClient aiServerClient;
 
@@ -126,7 +130,7 @@ class AiControllerTest {
 
     @Test
     void 의미_기반_검색은_AI_서버의_순서를_유지하고_없는_북마크는_제외한다() throws Exception {
-        given(aiServerClient.search(eq("자바 프레임워크"), anyInt(), anyList())).willReturn(List.of(
+        given(aiServerClient.search(argThat(request -> request.query().equals("자바 프레임워크")))).willReturn(List.of(
                 new Result(github.getId(), 0.9),
                 new Result(999_999L, 0.8),
                 new Result(spring.getId(), 0.7)));
@@ -135,17 +139,17 @@ class AiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SemanticSearchRequest("자바 프레임워크"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].bookmarkId").value(github.getId()))
-                .andExpect(jsonPath("$.data[0].url").value("https://github.com"))
-                .andExpect(jsonPath("$.data[0].similarity").value(0.9))
-                .andExpect(jsonPath("$.data[1].bookmarkId").value(spring.getId()))
-                .andExpect(jsonPath("$.data[1].summary").value("Java 웹 프레임워크"));
+                .andExpect(jsonPath("$.data.count").value(2))
+                .andExpect(jsonPath("$.data.results[0].bookmarkId").value(github.getId()))
+                .andExpect(jsonPath("$.data.results[0].url").value("https://github.com"))
+                .andExpect(jsonPath("$.data.results[0].similarity").value(0.9))
+                .andExpect(jsonPath("$.data.results[1].bookmarkId").value(spring.getId()))
+                .andExpect(jsonPath("$.data.results[1].summary").value("Java 웹 프레임워크"));
     }
 
     @Test
     void AI_서버_장애_시_502를_반환한다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt(), anyList())).willThrow(new AiServerException("down", null));
+        given(aiServerClient.search(any())).willThrow(new AiServerException("down", null));
 
         mockMvc.perform(post("/api/ai/search")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,7 +160,7 @@ class AiControllerTest {
 
     @Test
     void 유사_사이트를_추천받으면_자기_자신은_제외된다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt(), anyList())).willReturn(List.of(
+        given(aiServerClient.search(any())).willReturn(List.of(
                 new Result(spring.getId(), 1.0),
                 new Result(github.getId(), 0.6)));
 
@@ -186,26 +190,28 @@ class AiControllerTest {
 
     @Test
     void 스페이스를_지정하지_않으면_내가_속한_스페이스_전체를_AI에_전달한다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt(), anyList())).willReturn(List.of());
+        given(aiServerClient.search(any())).willReturn(List.of());
 
         mockMvc.perform(post("/api/ai/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SemanticSearchRequest("자바"))))
                 .andExpect(status().isOk());
 
-        verify(aiServerClient).search(eq("자바"), anyInt(), eq(List.of(space.getId())));
+        verify(aiServerClient).search(argThat(request -> request.query().equals("자바")
+                && request.spaceIds().equals(List.of(space.getId()))));
     }
 
     @Test
     void 스페이스를_지정하면_그_스페이스만_AI에_전달한다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt(), anyList())).willReturn(List.of());
+        given(aiServerClient.search(any())).willReturn(List.of());
 
         mockMvc.perform(post("/api/ai/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SemanticSearchRequest("자바", space.getId()))))
                 .andExpect(status().isOk());
 
-        verify(aiServerClient).search(eq("자바"), anyInt(), eq(List.of(space.getId())));
+        verify(aiServerClient).search(argThat(request -> request.query().equals("자바")
+                && request.spaceIds().equals(List.of(space.getId()))));
     }
 
     @Test
@@ -229,7 +235,7 @@ class AiControllerTest {
 
     @Test
     void AI가_범위_밖_북마크를_돌려줘도_결과에서_제외한다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt(), anyList())).willReturn(List.of(
+        given(aiServerClient.search(any())).willReturn(List.of(
                 new Result(othersBookmark.getId(), 0.99),
                 new Result(spring.getId(), 0.7)));
 
@@ -237,8 +243,8 @@ class AiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SemanticSearchRequest("아무거나"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].bookmarkId").value(spring.getId()));
+                .andExpect(jsonPath("$.data.count").value(1))
+                .andExpect(jsonPath("$.data.results[0].bookmarkId").value(spring.getId()));
     }
 
     @Test
@@ -252,9 +258,64 @@ class AiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SemanticSearchRequest("아무거나"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(0));
+                .andExpect(jsonPath("$.data.count").value(0));
 
-        verify(aiServerClient, never()).search(anyString(), anyInt(), anyList());
+        verify(aiServerClient, never()).search(any());
+    }
+
+    @Test
+    void 저장_날짜_조건을_AI에_전달하고_범위_밖_결과는_제외한다() throws Exception {
+        Bookmark old = saveAnalyzedBookmark("https://old.example", "old", "오래된 글", space);
+        jdbc.update("update bookmarks set created_at = ? where id = ?",
+                java.time.LocalDateTime.of(2026, 10, 1, 12, 0), old.getId());
+        entityManager.clear();
+        given(aiServerClient.search(any())).willReturn(List.of(
+                new Result(old.getId(), 0.95), new Result(spring.getId(), 0.7)));
+        String today = java.time.LocalDate.now().toString();
+
+        mockMvc.perform(post("/api/ai/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"query": "글", "savedFrom": "2026-11-01", "savedTo": "%s"}
+                                """.formatted(today)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.count").value(1))
+                .andExpect(jsonPath("$.data.results[0].bookmarkId").value(spring.getId()));
+
+        String expectedFrom = com.ssok.server.domain.ai.client.dto.AiTimeFormat.format(
+                java.time.LocalDate.of(2026, 11, 1).atStartOfDay());
+        String expectedTo = com.ssok.server.domain.ai.client.dto.AiTimeFormat.format(
+                java.time.LocalDate.now().plusDays(1).atStartOfDay());
+        verify(aiServerClient).search(argThat(request ->
+                request.savedFrom().equals(expectedFrom) && request.savedTo().equals(expectedTo)));
+    }
+
+    @Test
+    void 날짜_조건이_없으면_AI에_보내지_않고_limit은_top_k로_전달한다() throws Exception {
+        given(aiServerClient.search(any())).willReturn(List.of());
+
+        mockMvc.perform(post("/api/ai/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\": \"글\", \"limit\": 20}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.count").value(0));
+
+        verify(aiServerClient).search(argThat(request ->
+                request.topK() == 20 && request.savedFrom() == null && request.savedTo() == null));
+    }
+
+    @Test
+    void 시작일이_종료일보다_늦거나_limit이_범위를_벗어나면_400을_반환한다() throws Exception {
+        mockMvc.perform(post("/api/ai/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\": \"글\", \"savedFrom\": \"2026-11-10\", \"savedTo\": \"2026-11-01\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/ai/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\": \"글\", \"limit\": 51}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(aiServerClient);
     }
 
     @Test

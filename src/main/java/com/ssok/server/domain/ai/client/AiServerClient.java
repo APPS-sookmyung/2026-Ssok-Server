@@ -39,12 +39,12 @@ public class AiServerClient {
         }
     }
 
-    public List<AiSearchResponse.Result> search(String query, int topK, List<Long> spaceIds) {
+    public List<AiSearchResponse.Result> search(AiSearchRequest request) {
         try {
             AiSearchResponse response = aiRestClient.post()
                     .uri("/api/v1/ai/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new AiSearchRequest(query, topK, spaceIds))
+                    .body(request)
                     .retrieve()
                     .body(AiSearchResponse.class);
 
