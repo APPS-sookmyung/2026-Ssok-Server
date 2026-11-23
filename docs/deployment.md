@@ -39,8 +39,51 @@ curl http://localhost:8080/actuator/health   # {"status":"UP"}
 - 종료 시 처리 중 요청을 최대 20초 기다린다 (graceful shutdown).
 - MySQL·pgvector 포트는 `127.0.0.1`에만 열려 있다.
 
+## 배포 방식 (결정)
+
+```
+GitHub PR ──CI──▶ 테스트(MySQL) + 이미지 빌드 확인
+main push ──Deploy──▶ GHCR 이미지 푸시 ──SSH──▶ 서버에서 deploy/deploy.sh
+                                               └ 상태 확인 실패 시 이전 이미지로 롤백
+인터넷 ──HTTPS──▶ Nginx(호스트, Let's Encrypt) ──▶ 127.0.0.1:8080 Spring
+```
+
+- **서버**: Ubuntu 클라우드 VM 1대 (Docker, Docker Compose, Nginx, certbot 설치)
+- **도메인**: `api.{서비스 도메인}` → 서버 IP. `deploy/nginx/ssok.conf`의 `api.ssok.example`을 바꿔 쓴다.
+- **이미지**: `ghcr.io/apps-sookmyung/2026-ssok-server:{커밋 7자리}`, `:latest`
+
+### 서버 최초 준비
+
+```bash
+git clone https://github.com/APPS-sookmyung/2026-Ssok-Server.git ~/ssok && cd ~/ssok
+cp .env.example .env   # 운영 값 채우기 (SERVER_PUBLIC_URL=https://api.도메인)
+sudo cp deploy/nginx/ssok.conf /etc/nginx/sites-available/ssok.conf   # 도메인 수정
+sudo ln -s /etc/nginx/sites-available/ssok.conf /etc/nginx/sites-enabled/
+sudo certbot --nginx -d api.도메인
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### GitHub 저장소 설정
+
+| Secrets | 설명 |
+|---|---|
+| `DEPLOY_HOST` | 서버 IP 또는 도메인. 비어 있으면 이미지만 올리고 배포는 건너뜀 |
+| `DEPLOY_USER` | SSH 사용자 |
+| `DEPLOY_SSH_KEY` | SSH 개인 키 |
+| `DEPLOY_PORT` | 선택, 기본 22 |
+| `DEPLOY_PATH` | 선택, 기본 `~/ssok` |
+
+`production` Environment를 만들어 두면 배포 전 승인 단계를 걸 수 있다.
+
+### 수동 배포·롤백
+
+```bash
+SERVER_IMAGE=ghcr.io/apps-sookmyung/2026-ssok-server:abc1234 ./deploy/deploy.sh
+```
+
 ## 아직 정하지 않은 것
 
-- 배포 대상(클라우드·서버), 도메인, 파일 저장소
+- 클라우드 업체·서버 사양, 실제 도메인
+- 파일 저장소 (12번 작업)
 - DB 마이그레이션 도구, 백업·복구, 로그 수집 (18번 작업)
 - AI 서버 컨테이너의 실제 환경 변수 이름 (`docker-compose.yml`의 `ai-server`는 가정값)
