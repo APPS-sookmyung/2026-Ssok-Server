@@ -256,6 +256,74 @@ class BookmarkManagementTest {
                 .isEqualTo(VectorSyncOperation.DELETE);
     }
 
+    @Test
+    void 다른_스페이스로_공유하면_복사본이_생기고_원본은_남는다() throws Exception {
+        Bookmark source = bookmark(personal, "https://a.com", 3);
+        source.completeAnalysis("요약", "개발/기술", List.of("Java"));
+        bookmarkRepository.saveAndFlush(source);
+
+        String body = mockMvc.perform(post("/api/bookmarks/share").with(login())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarkIds\": [%d], \"targetSpaceId\": %d}".formatted(source.getId(), team.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.shared.length()").value(1))
+                .andExpect(jsonPath("$.data.shared[0].sourceBookmarkId").value(source.getId()))
+                .andExpect(jsonPath("$.data.skippedBookmarkIds.length()").value(0))
+                .andReturn().getResponse().getContentAsString();
+        long copyId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body)
+                .path("data").path("shared").get(0).path("bookmarkId").asLong();
+
+        Bookmark copy = bookmarkRepository.findById(copyId).orElseThrow();
+        assertThat(copy.getSpace().getId()).isEqualTo(team.getId());
+        assertThat(copy.getUrl()).isEqualTo("https://a.com");
+        assertThat(copy.getSummary()).isEqualTo("요약");
+        assertThat(copy.getTags()).containsExactly("Java");
+        assertThat(copy.getVisitCount()).isZero();
+        assertThat(copy.getAnalysisStatus()).isEqualTo(com.ssok.server.domain.bookmark.entity.AnalysisStatus.PENDING);
+        assertThat(copy.getAnalysisRequestId()).isNotEqualTo(source.getAnalysisRequestId());
+        assertThat(bookmarkRepository.findById(source.getId()).orElseThrow().getSpace().getId())
+                .isEqualTo(personal.getId());
+    }
+
+    @Test
+    void 대상_스페이스에_같은_URL이_있으면_건너뛴다() throws Exception {
+        Long duplicate = bookmark(personal, "https://a.com", 0).getId();
+        Long fresh = bookmark(personal, "https://b.com", 0).getId();
+        bookmark(team, "https://a.com", 0);
+
+        mockMvc.perform(post("/api/bookmarks/share").with(login())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarkIds\": [%d, %d], \"targetSpaceId\": %d}"
+                                .formatted(duplicate, fresh, team.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.shared.length()").value(1))
+                .andExpect(jsonPath("$.data.shared[0].sourceBookmarkId").value(fresh))
+                .andExpect(jsonPath("$.data.skippedBookmarkIds[0]").value(duplicate));
+    }
+
+    @Test
+    void 멤버가_아닌_스페이스로는_공유할_수_없다() throws Exception {
+        Long mine = bookmark(personal, "https://a.com", 0).getId();
+        long before = bookmarkRepository.count();
+
+        mockMvc.perform(post("/api/bookmarks/share").with(login())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarkIds\": [%d], \"targetSpaceId\": %d}".formatted(mine, othersSpace.getId())))
+                .andExpect(status().isForbidden());
+
+        assertThat(bookmarkRepository.count()).isEqualTo(before);
+    }
+
+    @Test
+    void 남의_북마크는_공유할_수_없다() throws Exception {
+        Long others = bookmark(othersSpace, "https://secret.com", 0).getId();
+
+        mockMvc.perform(post("/api/bookmarks/share").with(login())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarkIds\": [%d], \"targetSpaceId\": %d}".formatted(others, team.getId())))
+                .andExpect(status().isForbidden());
+    }
+
     private Space space(String name, SpaceType type, User member) {
         Space space = spaceRepository.save(Space.builder().name(name).type(type).owner(member).build());
         spaceMemberRepository.save(SpaceMember.builder().space(space).user(member).role(SpaceRole.OWNER).build());

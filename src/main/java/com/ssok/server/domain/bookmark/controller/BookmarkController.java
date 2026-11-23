@@ -10,6 +10,8 @@ import com.ssok.server.domain.bookmark.dto.BookmarkLookupDto;
 import com.ssok.server.domain.bookmark.dto.BookmarkMoveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveRequest;
 import com.ssok.server.domain.bookmark.dto.BookmarkSaveResponse;
+import com.ssok.server.domain.bookmark.dto.BookmarkShareRequest;
+import com.ssok.server.domain.bookmark.dto.BookmarkShareResponse;
 import com.ssok.server.domain.bookmark.dto.BookmarkSort;
 import com.ssok.server.domain.bookmark.dto.BookmarkSummaryDto;
 import com.ssok.server.domain.bookmark.service.BookmarkService;
@@ -109,6 +111,20 @@ public class BookmarkController {
                 requireUserId(authentication), request.bookmarkIds(), request.targetSpaceId());
 
         return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "bookmarks moved successfully", response));
+    }
+
+    @Operation(summary = "저장 사이트 공유",
+            description = "선택한 사이트를 다른 스페이스(예: 개인 → 팀)에 복사. 원본은 그대로 남음. "
+                    + "원본·대상 스페이스 모두의 멤버여야 하며, 하나라도 없거나 권한이 없으면 아무것도 공유하지 않음. "
+                    + "대상 스페이스에 같은 URL이 있으면 건너뜀. 복사본은 원본의 요약·태그를 보여주며 AI 분석이 새로 진행됨(PENDING)")
+    @PostMapping("/share")
+    public ResponseEntity<ApiResponse<BookmarkShareResponse>> share(
+            @RequestBody @Valid BookmarkShareRequest request, Authentication authentication) {
+        BookmarkShareResponse response =
+                bookmarkService.share(requireUserId(authentication), request.bookmarkIds(), request.targetSpaceId());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED.value(), "bookmarks shared successfully", response));
     }
 
     @Operation(summary = "저장 사이트 삭제", description = "저장된 사이트 삭제")
