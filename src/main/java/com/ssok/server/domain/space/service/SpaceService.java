@@ -31,6 +31,7 @@ public class SpaceService {
     private final BookmarkRepository bookmarkRepository;
     private final UserRepository userRepository;
     private final SpaceAccessService spaceAccessService;
+    private final com.ssok.server.domain.file.service.FileCleanupService fileCleanupService;
 
     @Transactional
     public SpaceCreateResponse create(Long userId, SpaceCreateRequest request) {
@@ -100,6 +101,7 @@ public class SpaceService {
         // 엔티티 삭제로 members/bookmarks에 REMOVE를 전파하고,
         // Bookmark의 ElementCollection인 bookmark_tags도 같은 트랜잭션에서 삭제한다.
         // 벌크 DELETE는 JPA 연쇄 삭제를 생략하므로 사용하지 않는다.
+        fileCleanupService.forSpace(spaceId);
         spaceRepository.delete(space);
     }
 

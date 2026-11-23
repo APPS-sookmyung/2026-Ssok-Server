@@ -36,6 +36,8 @@ public record BookmarkDetailResponse(
         @Schema(description = "태그 목록")
         List<String> tags,
 
-        @Schema(description = "라이브러리 ID. 미분류는 null") Long libraryId
+        @Schema(description = "라이브러리 ID. 미분류는 null") Long libraryId,
+        com.ssok.server.domain.bookmark.entity.BookmarkType type,
+        Long fileId
 ) {
 }

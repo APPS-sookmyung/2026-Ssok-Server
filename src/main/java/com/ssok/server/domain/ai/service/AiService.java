@@ -59,6 +59,9 @@ public class AiService {
                 .orElseThrow(() -> new BookmarkNotFoundException("bookmark not found"));
 
         spaceAccessService.requireSearch(userId, target.getSpace().getId());
+        if (target.getType() == com.ssok.server.domain.bookmark.entity.BookmarkType.FILE) {
+            throw new com.ssok.server.common.exception.InvalidRequestException("file AI recommendation is not supported yet");
+        }
         if (target.getSummary() == null) {
             return List.of();
         }
@@ -80,6 +83,7 @@ public class AiService {
         }
         List<Long> ids = results.stream().map(AiSearchResponse.Result::bookmarkId).toList();
         Map<Long, Bookmark> bookmarks = bookmarkRepository.findAllByIdInAndSpaceIdIn(ids, scope).stream()
+                .filter(bookmark -> bookmark.getType() == com.ssok.server.domain.bookmark.entity.BookmarkType.LINK)
                 .collect(Collectors.toMap(Bookmark::getId, Function.identity()));
 
         return results.stream()

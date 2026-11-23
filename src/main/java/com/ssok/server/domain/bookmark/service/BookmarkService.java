@@ -32,6 +32,7 @@ public class BookmarkService {
     private final SpaceAccessService spaceAccessService;
     private final ApplicationEventPublisher eventPublisher;
     private final com.ssok.server.domain.library.repository.LibraryRepository libraryRepository;
+    private final com.ssok.server.domain.file.service.FileCleanupService fileCleanupService;
 
     @Transactional
     public BookmarkSaveResponse save(Long userId, BookmarkSaveRequest request) {
@@ -100,6 +101,7 @@ public class BookmarkService {
                 .orElseThrow(() -> new SpaceNotFoundException("space not found"));
         spaceAccessService.requireWrite(userId, bookmark.getSpace().getId());
 
+        fileCleanupService.forBookmark(bookmarkId);
         bookmarkRepository.delete(bookmark);
     }
 
@@ -124,7 +126,8 @@ public class BookmarkService {
                 bookmark.getCategory(),
                 bookmark.getAnalysisStatus(),
                 bookmark.getTags(),
-                bookmark.getLibrary() == null ? null : bookmark.getLibrary().getId());
+                bookmark.getLibrary() == null ? null : bookmark.getLibrary().getId(),
+                bookmark.getType(), bookmark.getFile() == null ? null : bookmark.getFile().getId());
     }
 
     // AI 분석 결과에는 제목이 없으므로 URL의 호스트를 제목으로 사용한다.

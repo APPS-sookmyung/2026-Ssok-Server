@@ -30,12 +30,15 @@ public record BookmarkSummaryDto(
         @Schema(description = "태그 목록")
         List<String> tags,
 
-        @Schema(description = "라이브러리 ID. 미분류는 null") Long libraryId
+        @Schema(description = "라이브러리 ID. 미분류는 null") Long libraryId,
+        com.ssok.server.domain.bookmark.entity.BookmarkType type,
+        Long fileId
 ) {
     public static BookmarkSummaryDto from(com.ssok.server.domain.bookmark.entity.Bookmark bookmark) {
         return new BookmarkSummaryDto(bookmark.getId(), bookmark.getTitle(), bookmark.getSummary(), bookmark.getVisitCount(),
                 bookmark.getLastVisitedAt() == null ? null : com.ssok.server.common.util.TimeFormatter.format(bookmark.getLastVisitedAt()),
                 bookmark.getCategory(), bookmark.getAnalysisStatus(), bookmark.getTags(),
-                bookmark.getLibrary() == null ? null : bookmark.getLibrary().getId());
+                bookmark.getLibrary() == null ? null : bookmark.getLibrary().getId(),
+                bookmark.getType(), bookmark.getFile() == null ? null : bookmark.getFile().getId());
     }
 }

@@ -677,3 +677,11 @@ MySQL DDL은 자동 커밋되며 이 스크립트는 자동 실행되지 않습�
 라이브러리는 스페이스 아래 1단계이며, 북마크의 폴더 선택은 선택 사항입니다.
 폴더 삭제는 자료를 지우지 않고 연결만 해제합니다. OWNER·EDITOR는 생성·수정·삭제·검색 가능하며 VIEWER는 조회만 가능합니다.
 API·필터·동시성·DB 전환은 [라이브러리 문서](space-libraries.md)를 참고합니다.
+
+
+## 15. 로컬 파일 저장·첨부
+
+PDF·PNG·JPEG(최대 10 MiB)를 로컬 비공개 경로에 저장합니다.
+파일 북마크는 type=FILE·fileId·analysisStatus=NOT_SUPPORTED로 표시하고, 기존 링크는 type=LINK를 유지합니다.
+대화 첨부는 업로더 본인에게만 공개하며 실제 메시지 연결은 별도입니다.
+권한·다운로드·삭제 재시도·DB 전환은 [파일 API 문서](file-attachments.md)를 참고합니다.

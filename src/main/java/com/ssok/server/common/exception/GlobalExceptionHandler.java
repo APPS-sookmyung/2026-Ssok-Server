@@ -13,6 +13,33 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileNotFound(FileNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileStorage(FileStorageException e) {
+        return ResponseEntity.status(503).body(ApiResponse.error(503, e.getMessage()));
+    }
+
+    @ExceptionHandler({FileTooLargeException.class, org.springframework.web.multipart.MaxUploadSizeExceededException.class})
+    public ResponseEntity<ApiResponse<Void>> handleFileSize(Exception e) {
+        return ResponseEntity.status(413).body(ApiResponse.error(413, "maximum file size is 10 MiB"));
+    }
+
+    @ExceptionHandler(UnsupportedFileException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileType(UnsupportedFileException e) {
+        return ResponseEntity.status(415).body(ApiResponse.error(415, e.getMessage()));
+    }
+
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class})
+    public ResponseEntity<ApiResponse<Void>> handleRequestParameters(Exception e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "invalid request parameters"));
+    }
+
     @ExceptionHandler(LibraryNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleLibraryNotFound(LibraryNotFoundException e) {
         return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));

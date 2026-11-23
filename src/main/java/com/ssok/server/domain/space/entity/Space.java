@@ -61,6 +61,9 @@ public class Space {
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<com.ssok.server.domain.library.entity.Library> libraries = new ArrayList<>();
 
+    @OneToMany(mappedBy = "space", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<com.ssok.server.domain.file.entity.StoredFile> files = new ArrayList<>();
+
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
     // 스페이스 삭제 시 북마크와 그 태그 컬렉션까지 DB에서 제거한다.
     private List<Bookmark> bookmarks = new ArrayList<>();

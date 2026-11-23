@@ -69,6 +69,20 @@ public class Bookmark {
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(16) default 'LINK'")
+    private BookmarkType type = BookmarkType.LINK;
+
+    @jakarta.persistence.OneToOne(mappedBy = "bookmark", cascade = jakarta.persistence.CascadeType.REMOVE, orphanRemoval = true)
+    private com.ssok.server.domain.file.entity.StoredFile file;
+
+    public void markAsFile() {
+        type = BookmarkType.FILE;
+        analysisStatus = AnalysisStatus.NOT_SUPPORTED;
+    }
+
+    public void attachFile(com.ssok.server.domain.file.entity.StoredFile file) { this.file = file; }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "library_id", foreignKey = @jakarta.persistence.ForeignKey(name = "fk_bookmark_library"))
     @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
@@ -91,10 +105,12 @@ public class Bookmark {
     }
 
     public void requestAnalysis() {
+        requireLinkAnalysis();
         this.analysisStatus = AnalysisStatus.PENDING;
     }
 
     public void completeAnalysis(String summary, String category, List<String> tags) {
+        requireLinkAnalysis();
         this.summary = summary;
         this.category = category;
         this.tags.clear();
@@ -105,7 +121,14 @@ public class Bookmark {
     }
 
     public void failAnalysis() {
+        if (type == BookmarkType.FILE) return;
         this.analysisStatus = AnalysisStatus.FAILED;
+    }
+
+    private void requireLinkAnalysis() {
+        if (type == BookmarkType.FILE) {
+            throw new com.ssok.server.common.exception.InvalidRequestException("file AI analysis is not supported yet");
+        }
     }
 
     public void recordVisit() {
