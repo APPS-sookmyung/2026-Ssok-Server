@@ -25,6 +25,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.ssok.server.domain.auth.service.SessionService sessions;
+
+    @PostMapping("/refresh")
+    @SecurityRequirements
+    public ApiResponse<com.ssok.server.domain.auth.service.SessionService.Tokens> refresh(
+            @RequestBody @Valid com.ssok.server.domain.auth.dto.RefreshRequest request) {
+        return ApiResponse.success(200, "tokens refreshed", sessions.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Boolean> logout(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)
+                || !(authentication.getDetails() instanceof String sessionId)) {
+            throw new com.ssok.server.common.exception.UnauthenticatedException("authentication required");
+        }
+        sessions.logout(userId, sessionId);
+        return ApiResponse.success(200, "logged out", true);
+    }
 
     @Operation(summary = "회원가입", description = "회원가입을 진행")
     @PostMapping("/register")

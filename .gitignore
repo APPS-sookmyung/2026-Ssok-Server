@@ -66,3 +66,4 @@ out/
 
 ### Secrets ###
 application-secret.properties
+.data/files/

@@ -32,12 +32,33 @@ public class User {
     @Column(nullable = false)
     private String name;
 
-    @Column
+    @Column(length = 1000)
     private String profileImage;
+
+    @jakarta.persistence.ElementCollection
+    @jakarta.persistence.CollectionTable(name = "user_onboarding_purposes", joinColumns = @jakarta.persistence.JoinColumn(name = "user_id"),
+            uniqueConstraints = @jakarta.persistence.UniqueConstraint(name = "uk_user_onboarding_purpose", columnNames = {"user_id", "purpose"}))
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 32, columnDefinition = "varchar(32)")
+    private java.util.Set<OnboardingPurpose> onboardingPurposes = new java.util.LinkedHashSet<>();
+
+    @Column
+    private java.time.Instant onboardingCompletedAt;
+
+    public void completeOnboarding(java.util.Collection<OnboardingPurpose> purposes) {
+        onboardingPurposes.clear();
+        onboardingPurposes.addAll(purposes);
+        if (onboardingCompletedAt == null) onboardingCompletedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
 
     @UpdateTimestamp
     @Column
     private LocalDateTime updatedAt;
+
+    @Column
+    private java.time.Instant lastLoginAt;
+
+    public void recordLogin(java.time.Instant now) { lastLoginAt = now; }
 
     @Builder
     public User(String email, String password, String name) {

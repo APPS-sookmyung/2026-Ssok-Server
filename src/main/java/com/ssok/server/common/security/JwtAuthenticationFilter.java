@@ -18,7 +18,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final JwtTokenProvider jwtTokenProvider;
+    private final com.ssok.server.domain.auth.service.SessionService sessions;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -28,11 +28,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith(BEARER_PREFIX)) {
             String token = header.substring(BEARER_PREFIX.length());
             try {
-                Long userId = jwtTokenProvider.getUserIdFromAccessToken(token);
-                Authentication authentication =
-                        new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+                var data = sessions.authenticate(token);
+                var authentication = new UsernamePasswordAuthenticationToken(data.userId(), null, Collections.emptyList());
+                authentication.setDetails(data.sessionId());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (JwtException | IllegalArgumentException e) {
+            } catch (JwtException | IllegalArgumentException | com.ssok.server.common.exception.UnauthenticatedException e) {
                 SecurityContextHolder.clearContext();
             }
         }

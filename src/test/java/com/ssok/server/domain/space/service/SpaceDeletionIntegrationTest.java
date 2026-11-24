@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @DataJpaTest
-@Import(SpaceService.class)
+@Import({SpaceService.class, SpaceAccessService.class, com.ssok.server.domain.file.service.FileCleanupService.class})
 class SpaceDeletionIntegrationTest {
 
     @Autowired private TestEntityManager entities;
@@ -33,7 +33,7 @@ class SpaceDeletionIntegrationTest {
         for (SpaceType type : SpaceType.values()) {
             Space target = space(owner, type);
             Space preserved = space(owner, type);
-            membership(target, member, SpaceRole.MEMBER);
+            membership(target, member, SpaceRole.EDITOR);
             Bookmark first = bookmark(target, "first");
             Bookmark second = bookmark(target, "second");
             Bookmark retained = bookmark(preserved, "retained");
@@ -70,7 +70,7 @@ class SpaceDeletionIntegrationTest {
         User member = user("member@test.com");
         User outsider = user("outsider@test.com");
         Space target = space(owner, SpaceType.TEAM);
-        membership(target, member, SpaceRole.MEMBER);
+        membership(target, member, SpaceRole.EDITOR);
         Bookmark bookmark = bookmark(target, "protected");
         Long spaceId = target.getId();
         Long bookmarkId = bookmark.getId();

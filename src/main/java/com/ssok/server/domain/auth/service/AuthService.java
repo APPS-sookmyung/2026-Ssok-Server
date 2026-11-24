@@ -22,7 +22,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final SessionService sessions;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
@@ -50,18 +51,20 @@ public class AuthService {
         return new RegisterResponse(saved.getId(), saved.getEmail());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findLockedByEmail(request.email())
                 .orElseThrow(() -> new InvalidCredentialsException("invalid email or password"));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new InvalidCredentialsException("invalid email or password");
         }
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        events.publishEvent(new com.ssok.server.domain.notification.event.UserReturnedAfterAbsence(user.getId(), user.getLastLoginAt()));
+        user.recordLogin(java.time.Instant.now());
 
-        return new LoginResponse(accessToken, refreshToken, user.getId(), user.getName());
+        var pair = sessions.open(user.getId());
+
+        return new LoginResponse(pair.accessToken(), pair.refreshToken(), user.getId(), user.getName(), user.getOnboardingCompletedAt() != null);
     }
 }

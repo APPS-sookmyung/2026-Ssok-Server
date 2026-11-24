@@ -20,6 +20,26 @@ import org.springframework.web.client.RestClient;
 
 class AiServerClientTest {
 
+    @Test
+    void spaceVectorDeletionUsesAgreedPathAndSecret() {
+        org.springframework.test.util.ReflectionTestUtils.setField(aiServerClient, "vectorDeleteSecret", "test-only-secret");
+        server.expect(requestTo("http://ai-server/api/v1/ai/vectors?space_id=8"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("X-AI-Secret", "test-only-secret"))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(org.springframework.http.HttpStatus.NO_CONTENT));
+        aiServerClient.deleteSpaceVectors(8L);
+        server.verify();
+    }
+
+    @Test
+    void vectorDeletionRequiresSecretAndDoesNotAcceptUnexpectedSuccessStatus() {
+        assertThatThrownBy(() -> aiServerClient.deleteSpaceVectors(8L)).isInstanceOf(AiServerException.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(aiServerClient, "vectorDeleteSecret", "test-only-secret");
+        server.expect(requestTo("http://ai-server/api/v1/ai/vectors?space_id=8")).andRespond(withSuccess());
+        assertThatThrownBy(() -> aiServerClient.deleteSpaceVectors(8L)).isInstanceOf(AiServerException.class);
+        server.verify();
+    }
+
     private MockRestServiceServer server;
     private AiServerClient aiServerClient;
 
@@ -49,7 +69,7 @@ class AiServerClientTest {
         server.expect(requestTo("http://ai-server/api/v1/ai/search"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("""
-                        {"query": "그 리액트 버전 비교하는 글 뭐였지", "top_k": 5}
+                        {"query": "그 리액트 버전 비교하는 글 뭐였지", "top_k": 5, "space_ids": [8]}
                         """, true))
                 .andRespond(withSuccess("""
                         {
@@ -61,7 +81,7 @@ class AiServerClientTest {
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        List<AiSearchResponse.Result> results = aiServerClient.search("그 리액트 버전 비교하는 글 뭐였지", 5);
+        List<AiSearchResponse.Result> results = aiServerClient.search("그 리액트 버전 비교하는 글 뭐였지", 5, List.of(8L));
 
         assertThat(results).extracting(AiSearchResponse.Result::bookmarkId).containsExactly(123L, 74L);
         assertThat(results.get(0).similarity()).isEqualTo(0.895);
@@ -71,6 +91,6 @@ class AiServerClientTest {
     void AI_서버가_오류를_반환하면_AiServerException을_던진다() {
         server.expect(requestTo("http://ai-server/api/v1/ai/search")).andRespond(withServerError());
 
-        assertThatThrownBy(() -> aiServerClient.search("query", 5)).isInstanceOf(AiServerException.class);
+        assertThatThrownBy(() -> aiServerClient.search("query", 5, List.of(8L))).isInstanceOf(AiServerException.class);
     }
 }

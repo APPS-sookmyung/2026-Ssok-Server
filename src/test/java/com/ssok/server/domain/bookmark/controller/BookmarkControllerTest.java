@@ -33,6 +33,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @Transactional
 class BookmarkControllerTest {
+    @Autowired private com.ssok.server.domain.auth.service.SessionService testSessions;
 
     @Autowired
     private WebApplicationContext context;
@@ -70,7 +71,7 @@ class BookmarkControllerTest {
         spaceId = space.getId();
         ownerId = owner.getId();
 
-        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        String accessToken = testSessions.open(owner.getId()).accessToken();
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))

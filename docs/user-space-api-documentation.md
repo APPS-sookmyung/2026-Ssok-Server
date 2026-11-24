@@ -1,6 +1,9 @@
 # 지능형 북마크 웹 서비스
 ## 유저·스페이스 API 문서
 
+> **최신 백엔드 통합 명세:** [SSok 백엔드 API 명세서](backend-api-specification.md) (2026-11-23).
+> 이 문서는 유저·스페이스 사용 가이드입니다. 전체 경로·요청·응답·현재 연동 제한은 통합 명세를 우선 확인합니다.
+
 > 유저 인증·프로필 및 개인/팀 스페이스 기능의 API 계약 문서입니다.
 >
 > 기준: 현재 프로젝트 코드, API 명세서, 확정된 권한 정책
@@ -77,23 +80,42 @@ Swagger의 `Authorize` 입력창에는 프로젝트 설정상 `accessToken`만 �
 
 ## 3. 권한 정책
 
-| 기능 | 비로그인 | 비멤버 | MEMBER | OWNER |
-|---|---:|---:|---:|---:|
-| 스페이스 생성 | 불가 | - | 가능 | 가능 |
-| 스페이스 목록 조회 | 불가 | - | 가능 | 가능 |
-| 스페이스 상세 조회 | 불가 | 불가 | 가능 | 가능 |
-| 스페이스 삭제 | 불가 | 불가 | 불가 | 가능 |
-| 팀원 초대 | 불가 | 불가 | 불가 | TEAM만 가능 |
-| 팀원 목록 조회 | 불가 | 불가 | 가능 | 가능 |
-| 팀원 삭제 | 불가 | 불가 | 불가 | MEMBER 대상만 가능 |
-| MEMBER 자기 탈퇴 | 불가 | - | 지원하지 않음 | - |
+| 기능 | OWNER | EDITOR | VIEWER |
+|---|---|---|---|
+| 참여 스페이스 목록·상세, 북마크 목록·상세 | 가능 | 가능 | 가능 |
+| 북마크 저장·삭제 (같은 팀의 다른 저장자 자료 포함) | 가능 | 가능 | 불가 |
+| AI 재분석·검색·추천, 태그 검색 | 가능 | 가능 | 불가 |
+| 팀원 목록 | 가능 | 가능 | 불가 |
+| 팀원 초대·제거·역할 변경 | 가능 | 불가 | 불가 |
+| 스페이스 삭제 | 가능 | 불가 | 불가 |
 
-추가 정책:
+- 역할은 스페이스마다 적용합니다. 다른 스페이스의 역할로 접근할 수 없습니다.
+- 비로그인은 401, 해당 스페이스의 비멤버는 403입니다.
+- 로그인 사용자의 스페이스 생성은 기존대로 가능합니다.
+- `PERSONAL`에는 초대할 수 없고, OWNER의 제거·역할 변경은 지원하지 않습니다.
+- EDITOR·VIEWER는 팀 스페이스에서 직접 탈퇴할 수 있습니다. OWNER는 소유권 이전 후 탈퇴합니다. 개인 스페이스는 탈퇴·이전 대신 OWNER가 삭제할 수 있습니다.
+- 스페이스 삭제는 북마크·태그·멤버십을 MySQL에서 영구 삭제합니다. AI 벡터 삭제는 별도 연동 작업입니다.
+- 댓글 작성·대화 검색 API는 아직 구현 전입니다. 라이브러리 API는 space-libraries.md를 참고합니다. 이후 작성에는 `requireWrite`, 검색·대화에는 `requireSearch`를 적용해야 합니다.
 
-- `PERSONAL` 스페이스에는 팀원을 초대할 수 없습니다.
-- 팀원 초대는 `TEAM` 스페이스에서만 가능합니다.
-- OWNER는 삭제 대상이 될 수 없습니다.
-- 스페이스 삭제 시 해당 스페이스의 북마크와 북마크 태그, 멤버 정보를 DB에서 함께 영구 삭제합니다.
+### 백엔드 공통 권한 서비스
+
+`SpaceAccessService`는 내부 서비스이며, 사용자 ID는 인증 정보에서 전달합니다.
+
+| 메서드 | 동작 |
+|---|---|
+| `getAccessibleSpaceIds(userId)` | VIEWER를 포함한 참여 스페이스 목록 |
+| `getSearchableSpaceIds(userId)` | OWNER·EDITOR 스페이스만 반환 |
+| `requireMember(userId, spaceId)` | 모든 참여 역할 허용, 비멤버 403 |
+| `requireWrite(userId, spaceId)` | OWNER·EDITOR 허용, VIEWER 403 |
+| `requireSearch(userId, spaceId)` | OWNER·EDITOR 허용, VIEWER 403 |
+| `requireOwner(userId, spaceId)` | OWNER만 허용 |
+| `resolveSearchSpaceIds(userId, spaceId)` | 미지정 시 검색 가능 목록, 지정 시 존재 여부와 검색 권한 확인 |
+
+- 검색 스페이스가 없으면 404, 비멤버 또는 VIEWER이면 403입니다.
+- 전체 검색에서 검색 가능한 공간이 없으면 빈 목록을 반환하고 AI를 호출하지 않습니다.
+- 역할은 DB에서 조회하므로 역할 변경 후 다음 요청에 적용됩니다.
+- AI 검색은 허용된 `space_ids`를 전달하며, 반환된 북마크도 허용 공간에 속하는지 확인합니다.
+- AI 검색 요청의 선택 필드 `spaceId`, 태그 API의 선택 쿼리 `spaceId`로 특정 공간을 지정할 수 있습니다.
 
 ---
 
@@ -327,7 +349,7 @@ GET /api/spaces/{spaceId}
 
 인증: 필요
 
-권한: 해당 스페이스의 `OWNER` 또는 `MEMBER`만 가능
+권한: 해당 스페이스의 `OWNER`, `EDITOR`, `VIEWER`만 가능
 
 ### 성공 응답
 
@@ -380,7 +402,7 @@ DELETE /api/spaces/{spaceId}
 }
 ```
 
-`MEMBER`, 비멤버 및 비로그인 사용자는 삭제할 수 없습니다.
+`EDITOR`, 비멤버 및 비로그인 사용자는 삭제할 수 없습니다.
 
 삭제 범위: 해당 스페이스의 `bookmarks` 행(주소, 제목, 요약, 방문 정보 포함),
 그 북마크의 `bookmark_tags` 행, `space_members` 행과 `spaces` 행을 함께 영구 삭제합니다.
@@ -393,59 +415,17 @@ DELETE /api/spaces/{spaceId}
 
 ## 6.1 팀원 초대
 
-```http
-POST /api/spaces/{spaceId}/invite
-```
+`POST /api/spaces/{spaceId}/invitations` (기존 `/invite`도 같은 동작)
 
-인증: 필요
+OWNER가 이메일과 선택 역할(EDITOR 또는 VIEWER)을 지정해 초대를 발급합니다.
+201 응답에는 memberId 대신 invitationId·invitationUrl·expiresAt·status·delivery가 포함됩니다.
+가입 전 이메일도 초대할 수 있으며, 해당 이메일로 로그인한 사용자가 수락해야 멤버십이 생성됩니다.
 
-권한: `TEAM` 스페이스의 `OWNER`만 가능
-
-### Request Body
-
-```json
-{
-  "email": "member@test.com"
-}
-```
-
-### 성공 응답
-
-```text
-201 Created
-```
-
-```json
-{
-  "status": 201,
-  "success": true,
-  "message": "member invited successfully",
-  "data": {
-    "memberId": 2,
-    "email": "member@test.com"
-  }
-}
-```
-
-### 검증 순서
-
-1. 요청자가 해당 스페이스의 OWNER인지 확인합니다.
-2. 스페이스 타입이 TEAM인지 확인합니다.
-3. 이메일에 해당하는 User가 존재하는지 확인합니다.
-4. 이미 가입된 사용자인지 확인합니다.
-5. `MEMBER` 역할로 등록합니다.
-
-### 실패 응답
-
-| 상황 | 상태 코드 |
-|---|---:|
-| MEMBER 또는 비멤버가 초대 | 403 |
-| PERSONAL 스페이스에 초대 | 403 |
-| 존재하지 않는 사용자 | 404 |
-| 이미 가입된 사용자 | 409 |
+수락: `POST /api/spaces/invitations/accept`, 본문 `{"token":"초대 토큰"}`.
+발급·목록·취소·재발급·SMTP 설정·오류 코드의 상세 계약은 [초대 API 문서](space-invitations.md)를 참고합니다.
+기본 EDITOR·72시간·이메일별 1회 수락은 회의 전 임시 기준입니다.
 
 ---
-
 ## 6.2 팀원 목록 조회
 
 ```http
@@ -454,7 +434,7 @@ GET /api/spaces/{spaceId}/members
 
 인증: 필요
 
-권한: 해당 스페이스의 `OWNER` 또는 `MEMBER`
+권한: 해당 스페이스의 `OWNER` 또는 `EDITOR`
 
 ### 성공 응답
 
@@ -480,7 +460,7 @@ GET /api/spaces/{spaceId}/members
       "userId": 2,
       "nickname": "member",
       "email": "member@test.com",
-      "role": "MEMBER"
+      "role": "EDITOR"
     }
   ]
 }
@@ -496,7 +476,7 @@ DELETE /api/spaces/{spaceId}/members/{memberId}
 
 인증: 필요
 
-권한: `OWNER`만 가능하며, 대상은 `MEMBER`만 가능
+권한: `OWNER`만 가능하며, 대상은 `EDITOR` 또는 `VIEWER`만 가능
 
 ### 성공 응답
 
@@ -517,14 +497,14 @@ DELETE /api/spaces/{spaceId}/members/{memberId}
 
 ```text
 요청자: OWNER
-대상: MEMBER
+대상: EDITOR
 → 삭제 가능
 ```
 
 ### 차단되는 경우
 
 ```text
-요청자: MEMBER
+요청자: EDITOR
 → 삭제 불가
 
 요청자: 비멤버
@@ -534,7 +514,7 @@ DELETE /api/spaces/{spaceId}/members/{memberId}
 대상: OWNER
 → 삭제 불가
 
-요청자: MEMBER
+요청자: EDITOR
 대상: 자기 자신
 → 삭제 불가
 ```
@@ -557,7 +537,7 @@ DELETE /api/spaces/{spaceId}/members/{userId}
 |---:|---|---|
 | 400 | 잘못된 요청 | 필수값 누락, 잘못된 type |
 | 401 | 인증 실패 | 토큰 없음, 잘못된 토큰, 잘못된 로그인 |
-| 403 | 권한 없음 | MEMBER의 삭제·초대, 비멤버 조회 |
+| 403 | 권한 없음 | EDITOR의 삭제·초대, 비멤버 조회 |
 | 404 | 리소스 없음 | 없는 spaceId, userId, memberId |
 | 409 | 충돌 | 중복 이메일, 중복 멤버 초대 |
 | 500 | 서버 오류 | 처리되지 않은 예외 |
@@ -577,17 +557,17 @@ DELETE /api/spaces/{spaceId}/members/{userId}
 # 8. Swagger 통합 테스트 순서
 
 1. `POST /api/auth/register`로 OWNER 계정을 생성합니다.
-2. MEMBER와 비멤버 테스트 계정을 생성합니다.
+2. EDITOR와 비멤버 테스트 계정을 생성합니다.
 3. `POST /api/auth/login`으로 OWNER 로그인합니다.
 4. 응답의 `accessToken`을 복사합니다.
 5. Swagger `Authorize`에 토큰만 입력합니다.
 6. `POST /api/spaces`로 TEAM 스페이스를 생성합니다.
 7. 응답의 `spaceId`를 기록합니다.
-8. `POST /api/spaces/{spaceId}/invite`로 MEMBER를 초대합니다.
+8. `POST /api/spaces/{spaceId}/invitations`로 초대를 발급한 뒤, 수신 계정으로 로그인해 `/api/spaces/invitations/accept`에서 수락합니다.
 9. `GET /api/spaces/{spaceId}/members`로 `memberId`를 확인합니다.
-10. MEMBER 계정으로 로그인 후 상세·목록 조회를 확인합니다.
-11. MEMBER 권한으로 삭제·초대 요청이 차단되는지 확인합니다.
-12. OWNER 권한으로 MEMBER 삭제를 확인합니다.
+10. EDITOR 계정으로 로그인 후 상세·목록 조회를 확인합니다.
+11. EDITOR 권한으로 삭제·초대 요청이 차단되는지 확인합니다.
+12. OWNER 권한으로 EDITOR 삭제를 확인합니다.
 13. OWNER 삭제 시도와 존재하지 않는 `memberId`를 확인합니다.
 14. Swagger에서 Logout 후 토큰 없는 요청을 확인합니다.
 
@@ -603,15 +583,123 @@ DELETE /api/spaces/{spaceId}/members/{userId}
 - Swagger Authorize에는 accessToken만 입력합니다.
 - 로그인 사용자 ID는 Request Body로 임의 전달하지 않습니다.
 - `spaceId`, `userId`, `memberId`의 의미를 구분합니다.
-- OWNER와 MEMBER의 권한이 다릅니다.
+- OWNER·EDITOR·VIEWER의 권한이 다릅니다.
 - PERSONAL 스페이스에는 팀원을 초대할 수 없습니다.
 - 오류 응답은 `status`, `success`, `message` 형식으로 처리합니다.
 
 ## AI·북마크 담당자 협의 사항
 
 - AI 요청에서 `userId`와 `spaceId`를 어떻게 전달할지 결정합니다.
-- 팀 스페이스의 북마크 접근 권한을 합의합니다.
+- 북마크 조회는 모든 참여 역할, 저장·삭제와 AI 검색은 OWNER·EDITOR만 가능합니다.
 - 스페이스 삭제 시 해당 북마크와 태그가 DB에서 영구 삭제됨을 공유합니다.
 - 요약 결과가 개인 데이터인지 팀 스페이스 데이터인지 결정합니다.
 
 ---
+
+## 10. 팀원 역할 변경
+
+`PATCH /api/spaces/{spaceId}/members/{memberId}/role`
+
+OWNER만 호출할 수 있고, 대상 역할은 EDITOR 또는 VIEWER입니다.
+
+```json
+{"role":"VIEWER"}
+```
+
+성공 시 200과 변경된 `MemberDto`를 반환합니다. 비소유자·OWNER 대상 변경은 403,
+OWNER 역할 지정·구형 MEMBER·잘못된 역할·필드 누락은 400, 해당 공간에 없는 멤버는 404입니다.
+`memberId`는 사용자 ID가 아닌 멤버십 ID입니다.
+
+초대는 수락 후 멤버십을 생성합니다. 발송 상태와 수락·취소·재발급은 space-invitations.md를 참고합니다.
+
+## 11. 기존 DB 역할 전환
+
+기존 MEMBER 데이터가 있는 DB에는 `scripts/mysql/20261122_space_roles.sql`을 수동 적용합니다.
+백업 후 구버전 앱의 쓰기를 중단하고, 새 앱 시작(Hibernate 스키마 변경) 전에 실행합니다.
+SQL은 임시로 구형·신형 역할을 모두 허용하고 MEMBER를 EDITOR로 변환한 뒤 구형 역할을 제거합니다.
+MySQL DDL은 자동 커밋되며 이 스크립트는 자동 실행되지 않습니다.
+실제 운영 DB에는 이번 작업에서 실행하지 않았습니다.
+
+## 12. MySQL 역할 검증 (2026-11-22)
+
+- MySQL 8.4.11의 별도 테스트 DB에서 기존 OWNER 1건과 MEMBER 2건을 넣어 전환 SQL을 검증했습니다.
+- OWNER와 원본 ID가 유지되고 MEMBER가 EDITOR로 변환됐으며, VIEWER 저장과 SQL 재실행도 통과했습니다.
+- 별도 권한 테스트 DB에서 전체 83개 테스트가 통과했습니다. 역할별 조회·쓰기·AI 검색 제한, 역할 변경, 다른 공간 검색 결과 제외를 포함합니다.
+- 권한 API 검증은 MockMvc와 테스트 인증을 사용했으며, 실제 AI 서버 대신 모의 응답을 사용했습니다.
+- 운영 DB 전환과 배포 환경의 실제 토큰·AI 연동 검증은 별도입니다.
+
+## 13. 팀원 탈퇴 및 소유권 이전
+
+### 자기 탈퇴
+
+`DELETE /api/spaces/{spaceId}/members/me`
+
+- TEAM의 EDITOR·VIEWER가 직접 탈퇴합니다. 성공은 200, data는 true입니다.
+- 팀에 저장한 북마크와 다른 팀원의 데이터는 유지됩니다.
+- 탈퇴 후 해당 공간의 자료 조회·검색은 허용되지 않습니다.
+- OWNER는 먼저 소유권을 이전해야 합니다(직접 탈퇴 403).
+- 개인 스페이스의 탈퇴는 불가하지만, 기존 OWNER의 공간 삭제는 가능합니다.
+
+### 소유권 이전
+
+`PATCH /api/spaces/{spaceId}/owner`
+
+```json
+{"memberId":123}
+```
+
+- 현재 OWNER만 같은 팀의 EDITOR·VIEWER에게 이전할 수 있습니다.
+- 새 소유자는 OWNER, 기존 소유자는 EDITOR가 됩니다. 성공은 200과 신규 OWNER의 MemberDto입니다.
+- spaces.owner_id와 두 멤버의 역할을 한 트랜잭션에서 변경합니다.
+- 자기 자신에게 이전하거나 누락·0·음수 memberId를 보내면 400입니다.
+- 비멤버·비소유자·개인 공간 이전은 403, 없는 공간·다른 공간 또는 없는 대상은 404입니다.
+- 일반 역할 변경 API로 OWNER를 지정할 수 없다는 정책은 유지합니다.
+
+### 동시 변경
+
+초대·제거·역할 변경·탈퇴·소유권 이전·공간 삭제는 동일한 스페이스 행의 쓰기 잠금을 먼저 획득합니다.
+권한 검사는 잠금 획득 후 수행하여 이전 OWNER가 동시에 관리 작업을 계속하는 상황을 방지합니다.
+
+### 협업 항목
+
+- 프론트파트와 탈퇴 확인·소유권 이전 대상 선택·성공 후 화면 이동 및 현재 역할 갱신을 함께 진행합니다.
+- 다른 백엔드 담당자도 멤버십·소유권 변경 시 동일한 잠금 순서를 사용해야 합니다.
+- 2번의 폴더·초대·공유·AI 세부 명세는 docs/team-policy-proposal.md에 제안으로 구분했으며 팀 협의가 필요합니다.
+
+### 검증 결과 (2026-11-22)
+
+- MySQL 8.4.11 전용 테스트 DB에서 전체 91개 테스트 통과, 실패·오류·건너뜀 0건.
+- 동시 소유권 이전 두 요청 중 하나만 성공하고, OWNER 멤버십과 spaces.owner_id가 일치함을 확인했습니다.
+- 탈퇴 후 자료 접근 차단 및 팀 자료 보존, 이전 후 권한 변경, 개인 스페이스의 탈퇴·이전 차단 및 삭제 허용을 확인했습니다.
+- H2 기반 전체 기능 테스트 및 bootJar 빌드도 통과했습니다. API 테스트는 테스트 인증을 사용합니다.
+- 기존 서비스 DB에는 변경을 적용하지 않았습니다. 이번 기능은 추가 스키마 변경이 없습니다.
+
+
+## 14. 라이브러리 기능
+
+라이브러리는 스페이스 아래 1단계이며, 북마크의 폴더 선택은 선택 사항입니다.
+폴더 삭제는 자료를 지우지 않고 연결만 해제합니다. OWNER·EDITOR는 생성·수정·삭제·검색 가능하며 VIEWER는 조회만 가능합니다.
+API·필터·동시성·DB 전환은 [라이브러리 문서](space-libraries.md)를 참고합니다.
+
+
+## 15. 로컬 파일 저장·첨부
+
+PDF·PNG·JPEG(최대 10 MiB)를 로컬 비공개 경로에 저장합니다.
+파일 북마크는 type=FILE·fileId·analysisStatus=NOT_SUPPORTED로 표시하고, 기존 링크는 type=LINK를 유지합니다.
+대화 첨부는 업로더 본인에게만 공개하며 실제 메시지 연결은 별도입니다.
+권한·다운로드·삭제 재시도·DB 전환은 [파일 API 문서](file-attachments.md)를 참고합니다.
+
+
+## 16. 앱 내 알림
+
+초대·수락·멤버 변경 및 로그인 복귀 알림을 연결했습니다. 댓글은 담당 서비스의 이벤트 연결이 필요합니다.
+내 알림 목록·읽음·미읽음 개수와 현재 권한에 따른 이동 대상은 [알림 API 문서](notifications.md)를 참고합니다.
+복귀 안내는 로그인 시각을 사용합니다. 설문·세션·계정 삭제 정책은 onboarding-account.md를 참고합니다.
+
+
+## 17. 온보딩·계정 관리
+
+내 정보·복수 선택 설문·완료 상태, 세션별 로그아웃·토큰 갱신, 비밀번호 재확인 계정 삭제를 구현했습니다.
+팀 소유자는 소유권 이전 또는 공간 삭제 후 탈퇴할 수 있고, 참여 팀의 공유 자료는 보존합니다.
+배포 후 기존 세션 없는 JWT 사용자는 재로그인이 필요합니다.
+API·AI 정리 재시도·배포 SQL은 [온보딩·계정 문서](onboarding-account.md)를 참고합니다.

@@ -4,6 +4,7 @@ import com.ssok.server.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -11,6 +12,56 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(AccountDeletionConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountConflict(AccountDeletionConflictException e) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, e.getMessage()));
+    }
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotificationNotFound(NotificationNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileNotFound(FileNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileStorage(FileStorageException e) {
+        return ResponseEntity.status(503).body(ApiResponse.error(503, e.getMessage()));
+    }
+
+    @ExceptionHandler({FileTooLargeException.class, org.springframework.web.multipart.MaxUploadSizeExceededException.class})
+    public ResponseEntity<ApiResponse<Void>> handleFileSize(Exception e) {
+        return ResponseEntity.status(413).body(ApiResponse.error(413, "maximum file size is 10 MiB"));
+    }
+
+    @ExceptionHandler(UnsupportedFileException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileType(UnsupportedFileException e) {
+        return ResponseEntity.status(415).body(ApiResponse.error(415, e.getMessage()));
+    }
+
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class})
+    public ResponseEntity<ApiResponse<Void>> handleRequestParameters(Exception e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "invalid request parameters"));
+    }
+
+    @ExceptionHandler(LibraryNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLibraryNotFound(LibraryNotFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateLibraryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateLibrary(DuplicateLibraryException e) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, e.getMessage()));
+    }
+
+    @ExceptionHandler(InvitationConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvitationConflict(InvitationConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(409, e.getMessage()));
+    }
 
     @ExceptionHandler(DuplicateSpaceMemberException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateSpaceMember(DuplicateSpaceMemberException e) {
@@ -83,6 +134,11 @@ public class GlobalExceptionHandler {
         log.error("AI server call failed", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(ApiResponse.error(HttpStatus.BAD_GATEWAY.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidBody(HttpMessageNotReadableException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "invalid request"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -31,20 +31,30 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(Long userId) {
-        return generateToken(userId, ACCESS_TOKEN_TYPE, accessTokenValidityMs);
+        return generateToken(userId, ACCESS_TOKEN_TYPE, accessTokenValidityMs, null);
     }
 
     public String generateRefreshToken(Long userId) {
-        return generateToken(userId, REFRESH_TOKEN_TYPE, refreshTokenValidityMs);
+        return generateToken(userId, REFRESH_TOKEN_TYPE, refreshTokenValidityMs, null);
     }
 
-    private String generateToken(Long userId, String tokenType, long validityMs) {
+    public String generateAccessToken(Long userId, String sessionId) {
+        return generateToken(userId, ACCESS_TOKEN_TYPE, accessTokenValidityMs, sessionId);
+    }
+
+    public String generateRefreshToken(Long userId, String sessionId) {
+        return generateToken(userId, REFRESH_TOKEN_TYPE, refreshTokenValidityMs, sessionId);
+    }
+
+    private String generateToken(Long userId, String tokenType, long validityMs, String sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + validityMs);
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .id(java.util.UUID.randomUUID().toString())
                 .claim(TOKEN_TYPE_CLAIM, tokenType)
+                .claim("sid", sessionId)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -52,11 +62,16 @@ public class JwtTokenProvider {
     }
 
     public Long getUserIdFromAccessToken(String token) {
+        return accessData(token).userId();
+    }
+
+    public record TokenData(Long userId, String sessionId, java.time.Instant expiresAt) {}
+    public TokenData accessData(String token) { return tokenData(token, ACCESS_TOKEN_TYPE); }
+    public TokenData refreshData(String token) { return tokenData(token, REFRESH_TOKEN_TYPE); }
+    private TokenData tokenData(String token, String type) {
         Claims claims = parseClaims(token);
-        if (!ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) {
-            throw new JwtException("not an access token");
-        }
-        return Long.parseLong(claims.getSubject());
+        if (!type.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) throw new JwtException("invalid token type");
+        return new TokenData(Long.parseLong(claims.getSubject()), claims.get("sid", String.class), claims.getExpiration().toInstant());
     }
 
     private Claims parseClaims(String token) {

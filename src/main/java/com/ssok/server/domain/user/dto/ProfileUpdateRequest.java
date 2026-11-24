@@ -7,10 +7,10 @@ import org.hibernate.validator.constraints.URL;
 public record ProfileUpdateRequest(
 
         @Schema(description = "이름", example = "홍예빈")
-        @NotBlank(message = "invalid profile information") String name,
+        @NotBlank(message = "invalid profile information") @jakarta.validation.constraints.Size(max = 100) String name,
 
         @Schema(description = "프로필 이미지 URL", example = "https://example.com/profile.png")
-        @NotBlank(message = "invalid profile information")
+        @jakarta.validation.constraints.Size(max = 1000)
         @URL(message = "invalid profile information") String profileImage
 ) {
 }

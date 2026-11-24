@@ -2,6 +2,7 @@ package com.ssok.server.domain.ai.controller;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -21,6 +22,9 @@ import com.ssok.server.domain.bookmark.entity.Bookmark;
 import com.ssok.server.domain.bookmark.repository.BookmarkRepository;
 import com.ssok.server.domain.space.entity.Space;
 import com.ssok.server.domain.space.entity.SpaceType;
+import com.ssok.server.domain.space.entity.SpaceMember;
+import com.ssok.server.domain.space.entity.SpaceRole;
+import com.ssok.server.domain.space.repository.SpaceMemberRepository;
 import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.entity.User;
 import com.ssok.server.domain.user.repository.UserRepository;
@@ -40,6 +44,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @Transactional
 class AiControllerTest {
+    @Autowired private com.ssok.server.domain.auth.service.SessionService testSessions;
 
     @Autowired
     private WebApplicationContext context;
@@ -59,6 +64,9 @@ class AiControllerTest {
     private SpaceRepository spaceRepository;
 
     @Autowired
+    private SpaceMemberRepository spaceMemberRepository;
+
+    @Autowired
     private BookmarkRepository bookmarkRepository;
 
     @MockitoBean
@@ -73,11 +81,12 @@ class AiControllerTest {
                 User.builder().email("ai-test@ssok.com").password("encoded").name("tester").build());
         Space space = spaceRepository.save(
                 Space.builder().name("AI 테스트 스페이스").type(SpaceType.PERSONAL).owner(owner).build());
+        spaceMemberRepository.save(SpaceMember.builder().space(space).user(owner).role(SpaceRole.OWNER).build());
 
         spring = saveAnalyzedBookmark("https://spring.io", "spring.io", "Java 웹 프레임워크", space);
         github = saveAnalyzedBookmark("https://github.com", "github.com", "코드 호스팅 서비스", space);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(owner.getId());
+        String accessToken = testSessions.open(owner.getId()).accessToken();
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .defaultRequest(get("/").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -104,7 +113,7 @@ class AiControllerTest {
 
     @Test
     void 의미_기반_검색은_AI_서버의_순서를_유지하고_없는_북마크는_제외한다() throws Exception {
-        given(aiServerClient.search(eq("자바 프레임워크"), anyInt())).willReturn(List.of(
+        given(aiServerClient.search(eq("자바 프레임워크"), anyInt(), anyList())).willReturn(List.of(
                 new Result(github.getId(), 0.9),
                 new Result(999_999L, 0.8),
                 new Result(spring.getId(), 0.7)));
@@ -123,7 +132,7 @@ class AiControllerTest {
 
     @Test
     void AI_서버_장애_시_502를_반환한다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt())).willThrow(new AiServerException("down", null));
+        given(aiServerClient.search(anyString(), anyInt(), anyList())).willThrow(new AiServerException("down", null));
 
         mockMvc.perform(post("/api/ai/search")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +143,7 @@ class AiControllerTest {
 
     @Test
     void 유사_사이트를_추천받으면_자기_자신은_제외된다() throws Exception {
-        given(aiServerClient.search(anyString(), anyInt())).willReturn(List.of(
+        given(aiServerClient.search(anyString(), anyInt(), anyList())).willReturn(List.of(
                 new Result(spring.getId(), 1.0),
                 new Result(github.getId(), 0.6)));
 

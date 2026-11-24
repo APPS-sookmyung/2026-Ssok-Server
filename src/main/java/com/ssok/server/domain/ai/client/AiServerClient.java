@@ -20,6 +20,19 @@ import org.springframework.web.client.RestClientException;
 public class AiServerClient {
 
     private final RestClient aiRestClient;
+    @org.springframework.beans.factory.annotation.Value("${ai.server.vector-delete-secret:}")
+    private String vectorDeleteSecret;
+
+    public void deleteSpaceVectors(Long spaceId) {
+        if (vectorDeleteSecret == null || vectorDeleteSecret.isBlank()) {
+            throw new AiServerException("vector deletion authentication is not configured", null);
+        }
+        try {
+            var response = aiRestClient.delete().uri(builder -> builder.path("/api/v1/ai/vectors").queryParam("space_id", spaceId).build())
+                    .header("X-AI-Secret", vectorDeleteSecret).retrieve().toBodilessEntity();
+            if (response.getStatusCode().value() != 204) throw new AiServerException("unexpected vector deletion response", null);
+        } catch (RestClientException e) { throw new AiServerException("vector deletion failed", e); }
+    }
 
     public void requestAnalysis(Long bookmarkId, String url) {
         try {
@@ -34,12 +47,15 @@ public class AiServerClient {
         }
     }
 
-    public List<AiSearchResponse.Result> search(String query, int topK) {
+    public List<AiSearchResponse.Result> search(String query, int topK, List<Long> spaceIds) {
+        if (spaceIds.isEmpty()) {
+            return List.of();
+        }
         try {
             AiSearchResponse response = aiRestClient.post()
                     .uri("/api/v1/ai/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new AiSearchRequest(query, topK))
+                    .body(new AiSearchRequest(query, topK, List.copyOf(spaceIds)))
                     .retrieve()
                     .body(AiSearchResponse.class);
 

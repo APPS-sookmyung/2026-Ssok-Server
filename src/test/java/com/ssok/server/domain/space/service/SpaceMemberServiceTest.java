@@ -15,7 +15,7 @@ import com.ssok.server.domain.space.repository.SpaceRepository;
 import com.ssok.server.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
@@ -32,18 +32,23 @@ class SpaceMemberServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
     private SpaceMemberService spaceMemberService;
 
+    @BeforeEach
+    void setUp() {
+        spaceMemberService = new SpaceMemberService(spaceRepository, spaceMemberRepository,
+                new SpaceAccessService(spaceMemberRepository, spaceRepository), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
+    }
+
     @Test
-    void MEMBER는_팀원을_삭제할_수_없다() {
+    void EDITOR는_팀원을_삭제할_수_없다() {
         Long requesterId = 2L;
         Long spaceId = 1L;
-        given(spaceRepository.existsById(spaceId)).willReturn(true);
+        given(spaceRepository.findLockedById(spaceId)).willReturn(Optional.of(com.ssok.server.domain.space.entity.Space.builder().build()));
         Long memberId = 3L;
 
         SpaceMember requester = SpaceMember.builder()
-                .role(SpaceRole.MEMBER)
+                .role(SpaceRole.EDITOR)
                 .build();
 
         given(spaceMemberRepository
@@ -60,18 +65,18 @@ class SpaceMemberServiceTest {
     }
 
     @Test
-    void OWNER는_MEMBER를_삭제할_수_있다() {
+    void OWNER는_EDITOR를_삭제할_수_있다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
-        given(spaceRepository.existsById(spaceId)).willReturn(true);
+        given(spaceRepository.findLockedById(spaceId)).willReturn(Optional.of(com.ssok.server.domain.space.entity.Space.builder().build()));
         Long memberId = 3L;
 
         SpaceMember requester = SpaceMember.builder()
                 .role(SpaceRole.OWNER)
                 .build();
 
-        SpaceMember target = SpaceMember.builder()
-                .role(SpaceRole.MEMBER)
+        SpaceMember target = SpaceMember.builder().user(targetUser())
+                .role(SpaceRole.EDITOR)
                 .build();
 
         given(spaceMemberRepository
@@ -95,14 +100,14 @@ class SpaceMemberServiceTest {
     void OWNER는_OWNER를_삭제할_수_없다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
-        given(spaceRepository.existsById(spaceId)).willReturn(true);
+        given(spaceRepository.findLockedById(spaceId)).willReturn(Optional.of(com.ssok.server.domain.space.entity.Space.builder().build()));
         Long ownerMemberId = 2L;
 
         SpaceMember requester = SpaceMember.builder()
                 .role(SpaceRole.OWNER)
                 .build();
 
-        SpaceMember target = SpaceMember.builder()
+        SpaceMember target = SpaceMember.builder().user(targetUser())
                 .role(SpaceRole.OWNER)
                 .build();
 
@@ -129,7 +134,7 @@ class SpaceMemberServiceTest {
     void 존재하지_않는_멤버는_삭제할_수_없다() {
         Long requesterId = 1L;
         Long spaceId = 1L;
-        given(spaceRepository.existsById(spaceId)).willReturn(true);
+        given(spaceRepository.findLockedById(spaceId)).willReturn(Optional.of(com.ssok.server.domain.space.entity.Space.builder().build()));
         Long memberId = 999L;
 
         SpaceMember requester = SpaceMember.builder()
@@ -155,4 +160,8 @@ class SpaceMemberServiceTest {
         verify(spaceMemberRepository, never())
                 .delete(any(SpaceMember.class));
     }
-}
+    private com.ssok.server.domain.user.entity.User targetUser() {
+        var user = com.ssok.server.domain.user.entity.User.builder().name("target").email("target@test.com").password("test").build();
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 3L);
+        return user;
+    }}

@@ -36,30 +36,11 @@ class SpaceControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new SpaceController(
-                        new SpaceService(spaces, members, bookmarks, users),
-                        new SpaceMemberService(spaces, members, users)))
+                        new SpaceService(spaces, members, bookmarks, users, new SpaceAccessService(members, spaces),
+                                mock(com.ssok.server.domain.file.service.FileCleanupService.class)),
+                        new SpaceMemberService(spaces, members, new SpaceAccessService(members, spaces), mock(org.springframework.context.ApplicationEventPublisher.class))))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
-    }
-
-    @Test
-    void duplicateInvitationReturns409() throws Exception {
-        Space space = Space.builder().type(SpaceType.TEAM).build();
-        User user = User.builder().email("member@test.com").build();
-        ReflectionTestUtils.setField(user, "id", 2L);
-        when(spaces.findById(10L)).thenReturn(Optional.of(space));
-        when(members.findBySpaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(
-                SpaceMember.builder().role(SpaceRole.OWNER).build()));
-        when(users.findByEmail("member@test.com")).thenReturn(Optional.of(user));
-        when(members.existsBySpaceIdAndUserId(10L, 2L)).thenReturn(true);
-
-        mvc.perform(post("/api/spaces/10/invite").principal(authentication)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@test.com\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.success").value(false));
-        verify(members, never()).save(any());
     }
 
     @Test

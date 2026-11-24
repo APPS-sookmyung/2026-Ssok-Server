@@ -3,8 +3,10 @@ package com.ssok.server.domain.space.controller;
 import com.ssok.server.common.exception.UnauthenticatedException;
 import com.ssok.server.common.response.ApiResponse;
 import com.ssok.server.domain.space.dto.MemberDto;
-import com.ssok.server.domain.space.dto.MemberInviteRequest;
-import com.ssok.server.domain.space.dto.MemberInviteResponse;
+
+
+import com.ssok.server.domain.space.dto.MemberRoleUpdateRequest;
+import com.ssok.server.domain.space.dto.OwnershipTransferRequest;
 import com.ssok.server.domain.space.dto.SpaceCreateRequest;
 import com.ssok.server.domain.space.dto.SpaceCreateResponse;
 import com.ssok.server.domain.space.dto.SpaceDetailResponse;
@@ -22,6 +24,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -90,28 +93,6 @@ public class SpaceController {
         );
     }
 
-    @Operation(summary = "팀원 초대", description = "팀 스페이스에 새로운 팀원 초대")
-    @PostMapping("/{spaceId}/invite")
-    public ResponseEntity<ApiResponse<MemberInviteResponse>> invite(
-            Authentication authentication,
-            @PathVariable Long spaceId,
-            @RequestBody @Valid MemberInviteRequest request) {
-
-        MemberInviteResponse response =
-                spaceMemberService.invite(
-                        requireUserId(authentication),
-                        spaceId,
-                        request.email()
-                );
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(
-                        HttpStatus.CREATED.value(),
-                        "member invited successfully",
-                        response
-                ));
-    }
-
     @Operation(summary = "팀원 목록", description = "팀 스페이스에 참여 중인 팀원 목록 조회")
     @GetMapping("/{spaceId}/members")
     public ResponseEntity<ApiResponse<List<MemberDto>>> listMembers(
@@ -155,11 +136,35 @@ public class SpaceController {
         );
     }
 
+    @Operation(summary = "팀원 역할 변경", description = "OWNER가 팀원을 EDITOR 또는 VIEWER로 변경. OWNER 역할 변경 불가")
+    @PatchMapping("/{spaceId}/members/{memberId}/role")
+    public ResponseEntity<ApiResponse<MemberDto>> updateRole(
+            Authentication authentication, @PathVariable Long spaceId, @PathVariable Long memberId,
+            @RequestBody @Valid MemberRoleUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(), "member role updated successfully",
+                spaceMemberService.updateRole(requireUserId(authentication), spaceId, memberId, request.role())));
+    }
+
+    @Operation(summary = "팀 스페이스 탈퇴", description = "EDITOR·VIEWER 직접 탈퇴. OWNER는 소유권 이전 후 가능")
+    @DeleteMapping("/{spaceId}/members/me")
+    public ResponseEntity<ApiResponse<Boolean>> leave(Authentication authentication, @PathVariable Long spaceId) {
+        spaceMemberService.leave(requireUserId(authentication), spaceId);
+        return ResponseEntity.ok(ApiResponse.success(200, "space left successfully", true));
+    }
+
+    @Operation(summary = "팀 스페이스 소유권 이전", description = "OWNER가 기존 팀원에게 이전. 기존 OWNER는 EDITOR로 변경")
+    @PatchMapping("/{spaceId}/owner")
+    public ResponseEntity<ApiResponse<MemberDto>> transferOwnership(Authentication authentication,
+            @PathVariable Long spaceId, @RequestBody @Valid OwnershipTransferRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(200, "ownership transferred successfully",
+                spaceMemberService.transferOwnership(requireUserId(authentication), spaceId, request.memberId())));
+    }
+
     private Long requireUserId(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)) {
             throw new UnauthenticatedException("authentication required");
         }
 
-        return (Long) authentication.getPrincipal();
+        return userId;
     }
 }

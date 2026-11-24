@@ -2,5 +2,14 @@ package com.ssok.server.domain.space.entity;
 
 public enum SpaceRole {
     OWNER,
-    MEMBER
+    EDITOR,
+    VIEWER;
+
+    public boolean canWrite() {
+        return this == OWNER || this == EDITOR;
+    }
+
+    public boolean canSearch() {
+        return canWrite();
+    }
 }
